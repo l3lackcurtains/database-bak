@@ -128,8 +128,8 @@ export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab })
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Backup Jobs</h1>
-          <p className="text-muted-foreground">Monitor scheduled work separately from one-time backup and restore runs</p>
+          <h1 className="text-2xl font-bold tracking-tight">Jobs</h1>
+          <p className="text-muted-foreground">Monitor scheduled backup schedules and one-time backup/restore runs</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
           <Button variant="outline" onClick={fetchJobs}>
@@ -283,7 +283,7 @@ export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab })
                             <RotateCcw className="h-4 w-4" />
                           </Button>
                         )}
-                        {job.status !== 'running' && (
+                        {job.status !== 'running' && job.schedule && (
                           <Link href={`/jobs/${job.id}/edit`}>
                             <Button variant="ghost" size="icon" title="Edit">
                               <Edit3 className="h-4 w-4" />

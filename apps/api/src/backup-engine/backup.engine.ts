@@ -60,6 +60,19 @@ export class BackupEngine {
     });
   }
 
+  private mongoUriWithoutDatabase(uri: string, authDatabase?: string): string {
+    const match = uri.match(/^(mongodb(?:\+srv)?:\/\/[^/?]+)(\/[^?]*)?(\?.*)?$/);
+    if (!match) return uri;
+
+    const base = match[1];
+    const query = new URLSearchParams((match[3] || '').replace(/^\?/, ''));
+    if (authDatabase && !query.has('authSource')) {
+      query.set('authSource', authDatabase);
+    }
+    const queryString = query.toString();
+    return `${base}/${queryString ? `?${queryString}` : ''}`;
+  }
+
   private packageDump(rawData: Buffer): {
     data: Buffer;
     size: number;
@@ -256,14 +269,28 @@ export class BackupEngine {
       ? `${db.username}${db.password ? `:${db.password}` : ''}@`
       : '';
     const uri = db.url || `mongodb://${auth}${db.host}:${db.port}/${db.database}`;
-    const args = ['--uri', uri, '--archive', '--gzip'];
-
-    if (options.cleanBeforeRestore) {
-      args.push('--drop');
+    
+    // Explicitly clean the target database before restoring if requested
+    if (options.cleanBeforeRestore && db.database) {
+      this.logger.log(`Cleaning target database ${db.database} before restore`);
+      const { MongoClient } = await import('mongodb');
+      const cleanClient = new MongoClient(uri, { serverSelectionTimeoutMS: 10000 });
+      try {
+        await cleanClient.connect();
+        await cleanClient.db(db.database).dropDatabase();
+        this.logger.log(`Dropped target database ${db.database} successfully`);
+      } catch (err: any) {
+        this.logger.warn(`Failed to drop target database ${db.database}: ${err.message}`);
+      } finally {
+        await cleanClient.close();
+      }
     }
+
+    const args = ['--uri', uri, '--archive', '--gzip'];
 
     const sourceDatabase = snapshot.metadata?.database;
     if (sourceDatabase && db.database && sourceDatabase !== db.database) {
+      args[1] = this.mongoUriWithoutDatabase(uri, db.username ? db.database : undefined);
       args.push('--nsFrom', `${sourceDatabase}.*`, '--nsTo', `${db.database}.*`);
     }
 

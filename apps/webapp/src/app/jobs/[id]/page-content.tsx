@@ -111,11 +111,13 @@ export function JobDetailsPage({ params }: { params: Promise<{ id: string }> }) 
           <Button variant="outline" onClick={() => router.push('/jobs')}>
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
-          <Link href={`/jobs/${id}/edit`}>
-            <Button variant="outline">
-              <Edit3 className="h-4 w-4" /> Edit
-            </Button>
-          </Link>
+          {job.schedule && (
+            <Link href={`/jobs/${id}/edit`}>
+              <Button variant="outline">
+                <Edit3 className="h-4 w-4" /> Edit
+              </Button>
+            </Link>
+          )}
           {job.status !== 'running' && (
             <Button onClick={handleRunNow}>
               <Play className="h-4 w-4" /> Run Now

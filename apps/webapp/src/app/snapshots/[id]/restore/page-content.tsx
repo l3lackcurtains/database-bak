@@ -25,6 +25,7 @@ export function RestoreSnapshotPage({ params }: { params: Promise<{ id: string }
   const [targetDatabaseId, setTargetDatabaseId] = useState('');
   const [cleanBeforeRestore, setCleanBeforeRestore] = useState(false);
   const [showTargetForm, setShowTargetForm] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,8 +57,14 @@ export function RestoreSnapshotPage({ params }: { params: Promise<{ id: string }
     }
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    if (!snapshot || !targetDatabaseId) return;
+    setError(null);
+    setShowConfirm(true);
+  };
+
+  const executeRestore = async () => {
     if (!snapshot || !targetDatabaseId) return;
 
     setSaving(true);
@@ -81,8 +88,8 @@ export function RestoreSnapshotPage({ params }: { params: Promise<{ id: string }
     } catch (err) {
       console.error(err);
       setError('Failed to create restore job.');
-    } finally {
       setSaving(false);
+      setShowConfirm(false);
     }
   };
 
@@ -251,6 +258,62 @@ export function RestoreSnapshotPage({ params }: { params: Promise<{ id: string }
                   setShowTargetForm(false);
                 }}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onMouseDown={() => !saving && setShowConfirm(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-lg bg-background shadow-xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                Confirm Restore
+              </h2>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-sm">
+                You are about to restore the snapshot <strong>{snapshot.databaseName}</strong> to the target database <strong>{databases.find(db => db.id === targetDatabaseId)?.name || 'Unknown'}</strong>.
+              </p>
+              {cleanBeforeRestore && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                  <strong>Warning:</strong> "Clean target before restore" is checked. The <strong>entire target database will be dropped</strong> before restoring. Any existing data will be permanently lost!
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground">Are you sure you want to proceed?</p>
+              
+              <div className="flex justify-end gap-3 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowConfirm(false)}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="destructive"
+                  onClick={executeRestore} 
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <>
+                      <Spinner className="mr-2" size="sm" />
+                      Restoring...
+                    </>
+                  ) : (
+                    'Yes, Start Restore'
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
