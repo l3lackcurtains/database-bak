@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'DB Sync Dashboard',
-  description: 'Database backup, restore, and migration management',
+  title: 'Crumet Sync',
+  description: 'Database backup, restore, and migration management for Crumet Sync',
 };
 
 export default function RootLayout({

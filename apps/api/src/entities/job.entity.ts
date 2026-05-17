@@ -23,6 +23,9 @@ export interface JobEntity {
   status: JobStatus;
   schedule: {
     frequency: ScheduleFrequency;
+    frequencies?: ScheduleFrequency[];
+    intervalHours?: number;
+    intervalsHours?: number[];
     cronExpression: string | null;
     nextRunAt: string | null;
     timezone: string;
@@ -36,7 +39,16 @@ export interface JobEntity {
     excludeTables?: string[];
     cleanBeforeRestore?: boolean;
     targetDatabaseId?: string;
+    snapshotId?: string;
+    retention?: {
+      hourly?: number;
+      daily?: number;
+      weekly?: number;
+      monthly?: number;
+    };
   };
+  runCount: number;
+  failedRunCount: number;
   progress: number;
   currentStep: string;
   snapshotId: string | null;

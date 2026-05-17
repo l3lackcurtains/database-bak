@@ -11,6 +11,9 @@ export interface SnapshotEntity {
   databaseName: string;
   databaseType: 'postgres' | 'mongodb';
   storageId: string;
+  sourceType?: 'manual' | 'scheduled';
+  sourceJobId?: string;
+  sourceJobName?: string;
   storageKey: string;
   size: number;
   compressedSize: number;

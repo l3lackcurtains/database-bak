@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { dashboardApi, jobsApi, snapshotsApi } from '@/lib/api-routes';
 import type { DashboardStats, BackupJob, Snapshot } from '@/types';
-import { formatDate, formatNumber } from '@/lib/utils';
+import { formatBytes, formatDate } from '@/lib/utils';
 import {
   Database,
   HardDrive,
@@ -67,7 +67,7 @@ export function DashboardPage() {
     },
     {
       title: 'Storage Used',
-      value: formatNumber(stats?.totalStorageUsed ?? 0),
+      value: formatBytes(stats?.totalStorageUsed ?? 0),
       icon: ArrowUpCircle,
       color: 'text-success',
       href: '/storage',
@@ -107,11 +107,17 @@ export function DashboardPage() {
             Monitor your database backups and sync operations
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/jobs/new">
+        <div className="flex flex-wrap justify-end gap-2">
+          <Link href="/jobs/manual">
             <Button>
               <Play className="h-4 w-4" />
-              New Backup
+              Manual Backup
+            </Button>
+          </Link>
+          <Link href="/jobs/new">
+            <Button variant="outline">
+              <Clock className="h-4 w-4" />
+              Scheduled Job
             </Button>
           </Link>
           <Button variant="outline" onClick={() => window.location.reload()}>
@@ -154,8 +160,8 @@ export function DashboardPage() {
                   >
                     <div className="space-y-1">
                       <p className="text-sm font-medium">{job.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {job.databaseName} &rarr; {job.type}
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {job.type} for {job.databaseName}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -188,7 +194,7 @@ export function DashboardPage() {
                     <div className="space-y-1">
                       <p className="text-sm font-medium">{snapshot.databaseName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formatNumber(snapshot.compressedSize)} &middot;{' '}
+                        {formatBytes(snapshot.compressedSize)} &middot;{' '}
                         {snapshot.databaseType}
                       </p>
                     </div>

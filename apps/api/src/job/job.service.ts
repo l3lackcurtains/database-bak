@@ -26,6 +26,7 @@ export class JobService {
     status?: string,
     type?: string,
   ) {
+    this.ensureScheduledJobsHaveNextRun();
     let jobs = this.store.getAll<JobEntity>('jobs');
     if (status) jobs = jobs.filter((j) => j.status === status);
     if (type) jobs = jobs.filter((j) => j.type === type);
@@ -37,19 +38,102 @@ export class JobService {
   }
 
   async findOne(id: string): Promise<JobEntity | null> {
+    this.ensureScheduledJobsHaveNextRun();
     return this.store.getById<JobEntity>('jobs', id) || null;
+  }
+
+  private nextRunFrom(
+    schedule: JobEntity['schedule'],
+    from: Date = new Date(),
+  ): string | null {
+    if (!schedule) return null;
+    const intervalCandidates = (schedule.intervalsHours?.length ? schedule.intervalsHours : schedule.intervalHours ? [schedule.intervalHours] : [])
+      .filter((interval) => interval > 0)
+      .map((interval) => new Date(from.getTime() + interval * 60 * 60 * 1000).toISOString());
+    const frequencies = schedule.frequencies?.length ? schedule.frequencies : [schedule.frequency];
+    const candidates = frequencies
+      .map((frequency) => this.nextRunForFrequency(frequency, from))
+      .filter(Boolean) as string[];
+
+    const allCandidates = [...intervalCandidates, ...candidates];
+    if (allCandidates.length === 0) return null;
+    return allCandidates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0];
+  }
+
+  private nextRunForFrequency(
+    frequency: NonNullable<JobEntity['schedule']>['frequency'],
+    from: Date,
+  ): string | null {
+    const next = new Date(from);
+
+    if (frequency === 'hourly') {
+      next.setHours(next.getHours() + 1, 0, 0, 0);
+    } else if (frequency === 'daily') {
+      next.setDate(next.getDate() + 1);
+      next.setHours(2, 0, 0, 0);
+    } else if (frequency === 'weekly') {
+      next.setDate(next.getDate() + 7);
+      next.setHours(2, 0, 0, 0);
+    } else if (frequency === 'monthly') {
+      next.setMonth(next.getMonth() + 1, 1);
+      next.setHours(2, 0, 0, 0);
+    } else {
+      return null;
+    }
+
+    return next.toISOString();
+  }
+
+  private scheduleWithNextRun(
+    schedule?: CreateJobDto['schedule'] | UpdateJobDto['schedule'],
+    from: Date = new Date(),
+  ): JobEntity['schedule'] {
+    if (!schedule) return null;
+    const frequencies = schedule.frequencies?.filter((frequency) => frequency !== 'once' && frequency !== 'custom') || [];
+    const primaryFrequency = frequencies[0] || schedule.frequency;
+    const base = {
+      frequency: primaryFrequency,
+      frequencies: frequencies.length ? frequencies : undefined,
+      intervalHours: schedule.intervalHours,
+      intervalsHours: schedule.intervalsHours,
+      cronExpression: schedule.cronExpression || null,
+      nextRunAt: null,
+      timezone: schedule.timezone || 'UTC',
+    };
+    return {
+      ...base,
+      nextRunAt: this.nextRunFrom(base, from),
+    };
+  }
+
+  private scheduleSlug(schedule: JobEntity['schedule']): string {
+    if (!schedule) return 'manual';
+    const intervalSlugs = (schedule.intervalsHours?.length ? schedule.intervalsHours : schedule.intervalHours ? [schedule.intervalHours] : [])
+      .map((interval) => `every-${interval}-hours`);
+    const frequencySlugs = (schedule.frequencies?.length ? schedule.frequencies : [schedule.frequency])
+      .filter((frequency) => frequency !== 'once' && frequency !== 'custom');
+    const slug = [...intervalSlugs, ...frequencySlugs].join('-');
+    return slug || 'scheduled';
+  }
+
+  private ensureScheduledJobsHaveNextRun() {
+    const jobs = this.store.getAll<JobEntity>('jobs');
+    for (const job of jobs) {
+      if (!job.schedule || job.schedule.nextRunAt || job.status === 'running' || job.status === 'cancelled') continue;
+      const nextRunAt = this.nextRunFrom(job.schedule, new Date(job.completedAt || job.createdAt));
+      if (nextRunAt) {
+        this.store.update<JobEntity>('jobs', job.id, {
+          schedule: { ...job.schedule, nextRunAt },
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
   }
 
   private buildSchedule(
     schedule?: CreateJobDto['schedule'] | UpdateJobDto['schedule'],
   ): JobEntity['schedule'] {
-    if (!schedule) return null;
-    return {
-      frequency: schedule.frequency,
-      cronExpression: schedule.cronExpression || null,
-      nextRunAt: null,
-      timezone: schedule.timezone || 'UTC',
-    };
+    return this.scheduleWithNextRun(schedule);
   }
 
   async create(dto: CreateJobDto): Promise<JobEntity> {
@@ -70,7 +154,12 @@ export class JobService {
         compress: dto.options?.compress ?? true,
         encrypt: dto.options?.encrypt ?? false,
         targetDatabaseId: dto.options?.targetDatabaseId,
+        snapshotId: dto.options?.snapshotId,
+        cleanBeforeRestore: dto.options?.cleanBeforeRestore ?? false,
+        retention: dto.options?.retention,
       },
+      runCount: 0,
+      failedRunCount: 0,
       progress: 0,
       currentStep: 'Queued',
       snapshotId: null,
@@ -119,6 +208,9 @@ export class JobService {
               compress: dto.options.compress ?? existing.options.compress,
               encrypt: dto.options.encrypt ?? existing.options.encrypt,
               targetDatabaseId: dto.options.targetDatabaseId,
+              snapshotId: dto.options.snapshotId ?? existing.options.snapshotId,
+              cleanBeforeRestore: dto.options.cleanBeforeRestore ?? existing.options.cleanBeforeRestore,
+              retention: dto.options.retention ?? existing.options.retention,
             },
           }
         : {}),
@@ -188,6 +280,8 @@ export class JobService {
       status: 'running',
       startedAt: new Date().toISOString(),
       currentStep: 'Starting',
+      runCount: (job.runCount || 0) + 1,
+      ...(job.schedule ? { schedule: { ...job.schedule, nextRunAt: null } } : {}),
       updatedAt: new Date().toISOString(),
     });
 
@@ -211,12 +305,17 @@ export class JobService {
         await this.runMigrate(jobId, db, storage);
       }
 
+      const completedAt = new Date();
+      const latestJob = await this.findOne(jobId);
       this.store.update<JobEntity>('jobs', jobId, {
         status: 'success',
         progress: 100,
         currentStep: 'Completed',
-        completedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        completedAt: completedAt.toISOString(),
+        ...(latestJob?.schedule
+          ? { schedule: { ...latestJob.schedule, nextRunAt: this.nextRunFrom(latestJob.schedule, completedAt) } }
+          : {}),
+        updatedAt: completedAt.toISOString(),
       });
     } catch (error: any) {
       this.logger.error(`Job ${jobId} failed: ${error.message}`);
@@ -228,17 +327,24 @@ export class JobService {
           completedAt: new Date().toISOString(),
         });
       }
+      const failedAt = new Date();
+      const latestJob = await this.findOne(jobId);
       this.store.update<JobEntity>('jobs', jobId, {
         status: 'failed',
         error: error.message,
         currentStep: 'Failed',
-        completedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        completedAt: failedAt.toISOString(),
+        failedRunCount: (latestJob?.failedRunCount || 0) + 1,
+        ...(latestJob?.schedule
+          ? { schedule: { ...latestJob.schedule, nextRunAt: this.nextRunFrom(latestJob.schedule, failedAt) } }
+          : {}),
+        updatedAt: failedAt.toISOString(),
       });
     }
   }
 
   private async runBackup(jobId: string, db: any, storage: any): Promise<void> {
+    const job = await this.findOne(jobId);
     this.store.update<JobEntity>('jobs', jobId, {
       progress: 10,
       currentStep: 'Creating snapshot record',
@@ -249,6 +355,9 @@ export class JobService {
       databaseName: db.name,
       databaseType: db.type,
       storageId: storage.id,
+      sourceType: job?.schedule ? 'scheduled' : 'manual',
+      sourceJobId: jobId,
+      sourceJobName: job?.name,
     });
 
     this.store.update<JobEntity>('jobs', jobId, {
@@ -264,7 +373,13 @@ export class JobService {
       currentStep: 'Uploading to storage',
     });
 
-    const key = `${db.type}/${db.name}/${snapshot.id}.dump.gz`;
+    const timestamp = new Date(snapshot.startedAt).toISOString().replace(/[:.]/g, '-');
+    const safeDatabaseName = String(db.name || db.database || 'database')
+      .trim()
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'database';
+    const scheduleSlug = this.scheduleSlug(job?.schedule || null);
+    const key = `${db.type}/${safeDatabaseName}/${safeDatabaseName}-${scheduleSlug}-${timestamp}-${snapshot.id}.dump.gz`;
     const uploadResult = await this.storageService.uploadFile(
       storage,
       key,
@@ -295,16 +410,34 @@ export class JobService {
     db: any,
     storage: any,
   ): Promise<void> {
+    const job = await this.findOne(jobId);
+    const snapshotId = job?.options?.snapshotId;
+    if (!snapshotId) {
+      throw new Error('Snapshot not selected for restore');
+    }
+
+    const snapshot = await this.snapshotService.findOne(snapshotId);
+    if (!snapshot) {
+      throw new Error(`Snapshot not found: ${snapshotId}`);
+    }
+    if (snapshot.status !== 'completed') {
+      throw new Error(`Snapshot is not ready to restore: ${snapshot.status}`);
+    }
+
     this.store.update<JobEntity>('jobs', jobId, {
       progress: 30,
       currentStep: 'Fetching snapshot from storage',
     });
-    await new Promise((r) => setTimeout(r, 1000));
+    const archive = await this.storageService.downloadFile(storage, snapshot.storageKey);
+
     this.store.update<JobEntity>('jobs', jobId, {
       progress: 70,
       currentStep: 'Restoring database',
     });
-    await new Promise((r) => setTimeout(r, 1000));
+    await this.backupEngine.restoreDatabase(db, snapshot, archive, {
+      cleanBeforeRestore: job.options?.cleanBeforeRestore,
+    });
+
     this.store.update<JobEntity>('jobs', jobId, {
       progress: 95,
       currentStep: 'Verifying restore',
@@ -334,9 +467,15 @@ export class JobService {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async checkScheduledJobs() {
+    this.ensureScheduledJobsHaveNextRun();
+    const now = Date.now();
     const pendingJobs = this.store.findBy(
       'jobs',
-      (j: JobEntity) => j.status === 'pending' && !!j.schedule,
+      (j: JobEntity) =>
+        !!j.schedule?.nextRunAt &&
+        j.status !== 'running' &&
+        j.status !== 'cancelled' &&
+        new Date(j.schedule.nextRunAt).getTime() <= now,
     );
     for (const job of pendingJobs) {
       this.executeJob(job.id);

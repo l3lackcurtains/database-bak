@@ -34,6 +34,31 @@ export class BackupEngine {
     });
   }
 
+  private async runCommandWithInput(command: string, args: string[], input: Buffer): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const child = spawn(command, args, { stdio: ['pipe', 'ignore', 'pipe'] });
+      const stderr: Buffer[] = [];
+
+      child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+      child.on('error', (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') {
+          reject(new Error(`${command} is not installed or not available in PATH`));
+          return;
+        }
+        reject(error);
+      });
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+          return;
+        }
+        reject(new Error(Buffer.concat(stderr).toString('utf-8').trim() || `${command} exited with code ${code}`));
+      });
+
+      child.stdin.end(input);
+    });
+  }
+
   private packageDump(rawData: Buffer): {
     data: Buffer;
     size: number;
@@ -71,6 +96,36 @@ export class BackupEngine {
     }
 
     throw new Error(`Unsupported database type: ${db.type}`);
+  }
+
+  async restoreDatabase(
+    db: {
+      type: string;
+      host: string;
+      port: number;
+      database: string;
+      username: string;
+      password?: string;
+      url?: string;
+      ssl?: boolean;
+    },
+    snapshot: {
+      databaseType: string;
+      metadata?: Record<string, any> | null;
+    },
+    archive: Buffer,
+    options: { cleanBeforeRestore?: boolean } = {},
+  ): Promise<void> {
+    if (db.type !== snapshot.databaseType) {
+      throw new Error(`Cannot restore ${snapshot.databaseType} snapshot into ${db.type} database`);
+    }
+
+    if (db.type === 'mongodb') {
+      await this.restoreMongoDB(db, snapshot, archive, options);
+      return;
+    }
+
+    throw new Error(`Restore is not implemented for ${db.type} yet`);
   }
 
   private async dumpPostgres(db: any): Promise<{
@@ -175,6 +230,7 @@ export class BackupEngine {
         checksum,
         metadata: {
           version: 'mongodump',
+          database: db.database,
           collections: collectionNames,
           archive: true,
           gzip: true,
@@ -187,6 +243,30 @@ export class BackupEngine {
       }
       throw error;
     }
+  }
+
+  private async restoreMongoDB(
+    db: any,
+    snapshot: { metadata?: Record<string, any> | null },
+    archive: Buffer,
+    options: { cleanBeforeRestore?: boolean },
+  ): Promise<void> {
+    const auth = db.username
+      ? `${db.username}${db.password ? `:${db.password}` : ''}@`
+      : '';
+    const uri = db.url || `mongodb://${auth}${db.host}:${db.port}/${db.database}`;
+    const args = ['--uri', uri, '--archive', '--gzip'];
+
+    if (options.cleanBeforeRestore) {
+      args.push('--drop');
+    }
+
+    const sourceDatabase = snapshot.metadata?.database;
+    if (sourceDatabase && db.database && sourceDatabase !== db.database) {
+      args.push('--nsFrom', `${sourceDatabase}.*`, '--nsTo', `${db.database}.*`);
+    }
+
+    await this.runCommandWithInput('mongorestore', args, archive);
   }
 
   private async generateMockDump(db: any): Promise<{

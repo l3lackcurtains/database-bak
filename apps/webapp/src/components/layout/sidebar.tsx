@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { useSidebarStore } from '@/stores/sidebarStore';
+import { BrandLogo } from '@/components/brand/logo';
 import {
   LayoutDashboard,
   Database,
@@ -9,7 +10,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  BarChart3,
+  Archive,
   HardDrive,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -19,7 +20,7 @@ const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
   { icon: ArrowLeftRight, label: 'Jobs', href: '/jobs' },
   { icon: Database, label: 'Databases', href: '/databases' },
-  { icon: BarChart3, label: 'Snapshots', href: '/snapshots' },
+  { icon: Archive, label: 'Snapshots', href: '/snapshots' },
   { icon: HardDrive, label: 'Storage', href: '/storage' },
   { icon: Settings, label: 'Settings', href: '/settings' },
 ];
@@ -36,15 +37,16 @@ export function Sidebar() {
       )}
     >
       <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
-        {!collapsed && (
-          <Link href="/" className="flex items-center gap-2">
-            <ArrowLeftRight className="h-6 w-6 text-primary" />
-            <span className="text-lg font-semibold text-sidebar-foreground">DB Sync</span>
-          </Link>
-        )}
+        <Link href="/" className={cn('flex items-center gap-2', collapsed && 'sr-only')}>
+          <BrandLogo />
+          <span className="text-lg font-semibold tracking-tight text-sidebar-foreground">Crumet Sync</span>
+        </Link>
         <button
           onClick={toggle}
-          className="flex h-8 w-8 items-center justify-center rounded-md text-sidebar-foreground hover:bg-sidebar-accent"
+          className={cn(
+            'flex h-8 w-8 items-center justify-center rounded-md text-sidebar-foreground hover:bg-sidebar-accent',
+            collapsed && 'mx-auto',
+          )}
         >
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />
@@ -56,7 +58,7 @@ export function Sidebar() {
 
       <nav className="flex-1 space-y-1 p-3">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(`${item.href}/`));
           return (
             <Link
               key={item.href}

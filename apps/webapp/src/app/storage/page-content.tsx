@@ -10,7 +10,7 @@ import { storageApi } from '@/lib/api-routes';
 import { ApiError } from '@/lib/api';
 import type { StorageConfig } from '@/types';
 import { formatDate } from '@/lib/utils';
-import { Plus, Trash2, RefreshCw, Star, CheckCircle, XCircle, AlertCircle, Edit3 } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Star, Edit3 } from 'lucide-react';
 
 export function StoragePage() {
   const [storageConfigs, setStorageConfigs] = useState<StorageConfig[]>([]);
@@ -55,26 +55,18 @@ export function StoragePage() {
     return labels[provider] || provider;
   };
 
-  const statusIcon = (status: string) => {
-    switch (status) {
-      case 'connected': return <CheckCircle className="h-4 w-4 text-success" />;
-      case 'error': return <XCircle className="h-4 w-4 text-destructive" />;
-      default: return <AlertCircle className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
-
   if (loading) {
     return <div className="flex h-96 items-center justify-center"><Spinner size="lg" /></div>;
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Storage</h1>
           <p className="text-muted-foreground">Configure S3-compatible storage for backups</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 sm:justify-end">
           <Button variant="outline" onClick={fetchStorage}>
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
@@ -107,12 +99,11 @@ export function StoragePage() {
               No storage configured. Add an S3-compatible storage to store backups.
             </p>
           ) : (
-            <Table className="min-w-[700px]">
+            <Table className="min-w-[640px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[220px]">Configuration</TableHead>
-                  <TableHead className="w-[300px]">Storage</TableHead>
-                  <TableHead className="w-[180px]">State</TableHead>
+                  <TableHead className="w-[360px]">Storage</TableHead>
                   <TableHead className="w-[210px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -129,22 +120,16 @@ export function StoragePage() {
                       <div className="space-y-1">
                         <div className="max-w-[300px] truncate font-mono text-sm">{s.bucket}</div>
                         <div className="max-w-[300px] truncate font-mono text-xs text-muted-foreground">{s.endpoint}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          {statusIcon(s.status)}
-                          <span className="capitalize text-sm">{s.status}</span>
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          {s.isDefault ? (
+                            <Badge variant="success"><Star className="h-3 w-3 mr-1" /> Default</Badge>
+                          ) : (
+                            <Button variant="ghost" size="sm" className="h-6 px-0" onClick={() => handleSetDefault(s.id)}>
+                              Set Default
+                            </Button>
+                          )}
+                          <span className="text-xs text-muted-foreground">{formatDate(s.createdAt)}</span>
                         </div>
-                        {s.isDefault ? (
-                          <Badge variant="success"><Star className="h-3 w-3 mr-1" /> Default</Badge>
-                        ) : (
-                          <Button variant="ghost" size="sm" className="h-6 px-0" onClick={() => handleSetDefault(s.id)}>
-                            Set Default
-                          </Button>
-                        )}
-                        <div className="text-xs text-muted-foreground">{formatDate(s.createdAt)}</div>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -251,7 +236,7 @@ function StorageForm({
       <CardHeader><CardTitle>{isEditing ? 'Edit Storage Configuration' : 'Add Storage Configuration'}</CardTitle></CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="text-sm font-medium">Name</label>
               <input

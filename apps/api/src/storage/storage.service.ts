@@ -153,6 +153,25 @@ export class StorageService {
     return { url, expiresAt: new Date(Date.now() + 3600000).toISOString() };
   }
 
+  async downloadFile(storage: StorageEntity, key: string): Promise<Buffer> {
+    const client = this.createS3Client(storage);
+    const response = await client.send(
+      new GetObjectCommand({ Bucket: storage.bucket, Key: key }),
+    );
+    const body = response.Body;
+    if (!body) return Buffer.alloc(0);
+
+    if ('transformToByteArray' in body && typeof body.transformToByteArray === 'function') {
+      return Buffer.from(await body.transformToByteArray());
+    }
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of body as AsyncIterable<Uint8Array>) {
+      chunks.push(Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
   async deleteFile(storage: StorageEntity, key: string): Promise<void> {
     const client = this.createS3Client(storage);
     await client.send(

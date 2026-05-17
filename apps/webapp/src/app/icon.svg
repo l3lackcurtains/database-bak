@@ -1,0 +1,13 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="40" height="40" rx="12" fill="url(#crumet-sync-bg)" />
+  <path d="M12 13.5c0-2.21 3.58-4 8-4s8 1.79 8 4-3.58 4-8 4-8-1.79-8-4Z" fill="white" fill-opacity="0.96" />
+  <path d="M12 13.5v5c0 2.21 3.58 4 8 4 2.92 0 5.48-.78 6.88-1.94M28 13.5v2.75" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M11.8 23.5c1.17 2.03 4.3 3.5 8.2 3.5 2.92 0 5.48-.78 6.88-1.94" stroke="white" stroke-width="2.4" stroke-linecap="round" />
+  <path d="M26.3 27.6h4.2v-4.2M30.2 27.3a7 7 0 0 0-11.6-5.6M13.7 12.4H9.5v4.2M9.8 12.7a7 7 0 0 0 11.6 5.6" stroke="#B7F7CE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+  <defs>
+    <linearGradient id="crumet-sync-bg" x1="5" y1="4" x2="35" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16A34A" />
+      <stop offset="1" stop-color="#0F766E" />
+    </linearGradient>
+  </defs>
+</svg>

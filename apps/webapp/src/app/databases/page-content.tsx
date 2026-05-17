@@ -9,14 +9,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { databasesApi } from '@/lib/api-routes';
 import { ApiError } from '@/lib/api';
 import type { Database } from '@/types';
-import { formatDate } from '@/lib/utils';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Link2, Edit3 } from 'lucide-react';
+import { Copy, Plus, Trash2, RefreshCw, Link2, Edit3 } from 'lucide-react';
 
 export function DatabasesPage() {
   const [databases, setDatabases] = useState<Database[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingDatabase, setEditingDatabase] = useState<Database | null>(null);
+  const [cloningDatabase, setCloningDatabase] = useState<Database | null>(null);
 
   const fetchDatabases = () => {
     databasesApi.list()
@@ -42,45 +42,41 @@ export function DatabasesPage() {
     }
   };
 
-  const statusIcon = (status: string) => {
-    switch (status) {
-      case 'connected': return <CheckCircle className="h-4 w-4 text-success" />;
-      case 'error': return <XCircle className="h-4 w-4 text-destructive" />;
-      default: return <AlertCircle className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
-
   if (loading) {
     return <div className="flex h-96 items-center justify-center"><Spinner size="lg" /></div>;
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Databases</h1>
           <p className="text-muted-foreground">Manage your database connections</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 sm:justify-end">
           <Button variant="outline" onClick={fetchDatabases}>
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
-          <Button onClick={() => { setEditingDatabase(null); setShowForm(!showForm); }}>
+          <Button onClick={() => { setEditingDatabase(null); setCloningDatabase(null); setShowForm(!showForm); }}>
             <Plus className="h-4 w-4" /> Add Database
           </Button>
         </div>
       </div>
 
-      {(showForm || editingDatabase) && (
+      {(showForm || editingDatabase || cloningDatabase) && (
         <DatabaseForm
-          database={editingDatabase}
+          key={`${editingDatabase ? 'edit' : cloningDatabase ? 'clone' : 'new'}-${(editingDatabase || cloningDatabase)?.id || 'empty'}`}
+          database={editingDatabase || cloningDatabase}
+          clone={Boolean(cloningDatabase)}
           onCancel={() => {
             setShowForm(false);
             setEditingDatabase(null);
+            setCloningDatabase(null);
           }}
           onSuccess={() => {
             setShowForm(false);
             setEditingDatabase(null);
+            setCloningDatabase(null);
             fetchDatabases();
           }}
         />
@@ -96,12 +92,11 @@ export function DatabasesPage() {
               No database connections configured. Add one to get started.
             </p>
           ) : (
-            <Table className="min-w-[640px]">
+            <Table className="min-w-[560px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[220px]">Connection</TableHead>
-                  <TableHead className="w-[260px]">Target</TableHead>
-                  <TableHead className="w-[160px]">Status</TableHead>
+                  <TableHead className="w-[320px]">Target</TableHead>
                   <TableHead className="w-[190px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -116,19 +111,8 @@ export function DatabasesPage() {
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        <div className="max-w-[260px] truncate font-mono text-sm">{db.host}:{db.port}</div>
-                        <div className="max-w-[260px] truncate text-sm text-muted-foreground">{db.database}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          {statusIcon(db.status)}
-                          <span className="capitalize text-sm">{db.status}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatDate(db.lastCheckedAt)}
-                        </div>
+                        <div className="max-w-[320px] truncate font-mono text-sm">{db.host}:{db.port}</div>
+                        <div className="max-w-[320px] truncate text-sm text-muted-foreground">{db.database}</div>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -149,10 +133,22 @@ export function DatabasesPage() {
                           size="sm"
                           onClick={() => {
                             setShowForm(false);
+                            setCloningDatabase(null);
                             setEditingDatabase(db);
                           }}
                         >
                           <Edit3 className="h-4 w-4" /> Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setShowForm(false);
+                            setEditingDatabase(null);
+                            setCloningDatabase(db);
+                          }}
+                        >
+                          <Copy className="h-4 w-4" /> Clone
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleDelete(db.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -170,21 +166,26 @@ export function DatabasesPage() {
   );
 }
 
-function DatabaseForm({
+export function DatabaseForm({
   database,
+  clone = false,
+  defaultType = 'postgres',
   onCancel,
   onSuccess,
 }: {
   database?: Database | null;
+  clone?: boolean;
+  defaultType?: Database['type'];
   onCancel: () => void;
-  onSuccess: () => void;
+  onSuccess: (database?: Database) => void | Promise<void>;
 }) {
-  const isEditing = Boolean(database);
+  const isEditing = Boolean(database) && !clone;
+  const isCloning = Boolean(database) && clone;
   const [mode, setMode] = useState<'url' | 'fields'>(database?.url ? 'url' : 'fields');
   const [connectionUrl, setConnectionUrl] = useState(database?.url || '');
   const [form, setForm] = useState({
-    name: database?.name || '',
-    type: database?.type || ('postgres' as 'postgres' | 'mongodb'),
+    name: isCloning && database?.name ? `${database.name} copy` : database?.name || '',
+    type: database?.type || defaultType,
     host: database?.host || '',
     port: database?.port || 5432,
     database: database?.database || '',
@@ -255,16 +256,17 @@ function DatabaseForm({
     e.preventDefault();
     try {
       const payload = mode === 'url' ? { ...form, url: connectionUrl.trim() } : form;
-      if (database) {
-        await databasesApi.update(database.id, payload);
+      let savedDatabase: Database;
+      if (isEditing && database) {
+        savedDatabase = await databasesApi.update(database.id, payload);
       } else {
-        await databasesApi.create(payload);
+        savedDatabase = await databasesApi.create(payload);
       }
-      onSuccess();
+      await onSuccess(savedDatabase);
     } catch (error) {
       setTestResult({
         success: false,
-        message: error instanceof ApiError ? error.message : `Failed to ${isEditing ? 'update' : 'add'} database connection`,
+        message: error instanceof ApiError ? error.message : `Failed to ${isEditing ? 'update' : isCloning ? 'clone' : 'add'} database connection`,
       });
     }
   };
@@ -272,7 +274,7 @@ function DatabaseForm({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>{isEditing ? 'Edit Database Connection' : 'Add Database Connection'}</CardTitle>
+        <CardTitle>{isEditing ? 'Edit Database Connection' : isCloning ? 'Clone Database Connection' : 'Add Database Connection'}</CardTitle>
         <div className="flex gap-2">
           <Button
             variant={mode === 'url' ? 'default' : 'outline'}
@@ -316,7 +318,7 @@ function DatabaseForm({
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="text-sm font-medium">Type</label>
                 <select
@@ -408,7 +410,7 @@ function DatabaseForm({
               {testing ? 'Testing...' : 'Test Connection'}
             </Button>
             <Button type="submit" disabled={!form.host || !form.database}>
-              {isEditing ? 'Save Changes' : 'Add Connection'}
+              {isEditing ? 'Save Changes' : isCloning ? 'Create Clone' : 'Add Connection'}
             </Button>
           </div>
         </form>

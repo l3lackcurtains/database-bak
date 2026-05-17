@@ -1,7 +1,7 @@
 'use client';
 
 import { useThemeStore } from '@/stores/themeStore';
-import { Sun, Moon, Bell } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 
@@ -10,7 +10,8 @@ const pageTitle: Record<string, string> = {
   '/databases': 'Databases',
   '/snapshots': 'Snapshots',
   '/jobs': 'Backup Jobs',
-  '/jobs/new': 'New Job',
+  '/jobs/manual': 'Manual Backup',
+  '/jobs/new': 'Scheduled Job',
   '/storage': 'Storage',
   '/analytics': 'Analytics',
   '/settings': 'Settings',
@@ -19,7 +20,7 @@ const pageTitle: Record<string, string> = {
 export function Header() {
   const { resolvedTheme, toggleTheme } = useThemeStore();
   const pathname = usePathname();
-  const title = pageTitle[pathname] || 'Dashboard';
+  const title = pageTitle[pathname] || (pathname.includes('/restore') ? 'Restore Snapshot' : pathname.includes('/edit') ? 'Edit Job' : pathname.startsWith('/jobs/') ? 'Job Details' : 'Dashboard');
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-card px-6">
@@ -28,11 +29,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={toggleTheme}>
+        <Button variant="ghost" size="icon" onClick={toggleTheme} title="Toggle theme">
           {resolvedTheme === 'dark' ? (
             <Sun className="h-5 w-5" />
           ) : (

@@ -69,6 +69,9 @@ export const jobsApi = {
     type: 'backup' | 'restore' | 'migrate';
     schedule?: {
       frequency: string;
+      frequencies?: string[];
+      intervalHours?: number;
+      intervalsHours?: number[];
       cronExpression?: string;
       timezone?: string;
     };
@@ -81,6 +84,9 @@ export const jobsApi = {
     type?: 'backup' | 'restore' | 'migrate';
     schedule?: {
       frequency: string;
+      frequencies?: string[];
+      intervalHours?: number;
+      intervalsHours?: number[];
       cronExpression?: string;
       timezone?: string;
     } | null;
