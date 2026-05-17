@@ -1,0 +1,189 @@
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { JsonStore } from '../common/json.store';
+import { DatabaseEntity } from '../entities/database.entity';
+import {
+  CreateDatabaseDto,
+  UpdateDatabaseDto,
+  parseDatabaseUrl,
+} from './database.types';
+
+@Injectable()
+export class DatabaseService {
+  constructor(private store: JsonStore) {}
+
+  async findAll(): Promise<DatabaseEntity[]> {
+    return this.store.getAll<DatabaseEntity>('databases');
+  }
+
+  async findOne(id: string): Promise<DatabaseEntity | null> {
+    return this.store.getById<DatabaseEntity>('databases', id) || null;
+  }
+
+  async create(dto: CreateDatabaseDto): Promise<DatabaseEntity> {
+    let data: Partial<DatabaseEntity>;
+
+    if (dto.url) {
+      const parsed = parseDatabaseUrl(dto.url);
+      if (!parsed) throw new Error('Invalid connection URL');
+      data = {
+        id: '',
+        name: dto.name || parsed.name || 'unnamed',
+        type: dto.type || parsed.type!,
+        host: dto.host || parsed.host!,
+        port: dto.port || parsed.port!,
+        database: dto.database || parsed.database!,
+        username: dto.username || parsed.username || '',
+        password: dto.password || parsed.password,
+        url: dto.url,
+        ssl: dto.ssl ?? parsed.ssl ?? false,
+        status: 'disconnected',
+        lastCheckedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    } else {
+      data = {
+        id: '',
+        name: dto.name!,
+        type: dto.type!,
+        host: dto.host!,
+        port: dto.port!,
+        database: dto.database!,
+        username: dto.username || '',
+        password: dto.password,
+        url: dto.url,
+        ssl: dto.ssl ?? false,
+        status: 'disconnected',
+        lastCheckedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    const id = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
+    const entity = { ...data, id } as DatabaseEntity;
+    return this.store.create('databases', entity);
+  }
+
+  async update(
+    id: string,
+    dto: UpdateDatabaseDto,
+  ): Promise<DatabaseEntity | null> {
+    return this.store.update<DatabaseEntity>('databases', id, {
+      ...dto,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  async remove(id: string): Promise<void> {
+    const jobs = this.store.findBy('jobs', (job: { databaseId?: string }) => job.databaseId === id);
+    if (jobs.length > 0) {
+      throw new BadRequestException('Cannot delete database while jobs reference it');
+    }
+    this.store.delete('databases', id);
+  }
+
+  async testConnection(
+    dto: CreateDatabaseDto,
+  ): Promise<{ success: boolean; message: string }> {
+    let config: {
+      type: string;
+      host: string;
+      port: number;
+      database: string;
+      username: string;
+      password?: string;
+      ssl?: boolean;
+    };
+
+    if (dto.url) {
+      const parsed = parseDatabaseUrl(dto.url);
+      if (!parsed) return { success: false, message: 'Invalid connection URL' };
+      config = {
+        type: parsed.type!,
+        host: parsed.host!,
+        port: parsed.port!,
+        database: parsed.database!,
+        username: parsed.username || '',
+        password: parsed.password,
+        ssl: parsed.ssl,
+      };
+    } else {
+      config = {
+        type: dto.type!,
+        host: dto.host!,
+        port: dto.port!,
+        database: dto.database!,
+        username: dto.username || '',
+        password: dto.password,
+        ssl: dto.ssl,
+      };
+    }
+
+    try {
+      if (config.type === 'postgres') {
+        const { Client } = await import('pg').catch(() => ({ Client: null }));
+        if (!Client) {
+          return {
+            success: false,
+            message: 'pg driver not installed. Run: bun add pg',
+          };
+        }
+        const clientOptions = dto.url
+          ? {
+              connectionString: dto.url,
+              ssl: config.ssl ? { rejectUnauthorized: false } : undefined,
+              connectionTimeoutMillis: 5000,
+            }
+          : {
+              host: config.host,
+              port: config.port,
+              database: config.database,
+              user: config.username,
+              password: config.password,
+              ssl: config.ssl ? { rejectUnauthorized: false } : false,
+              connectionTimeoutMillis: 5000,
+            };
+        const client = new Client(clientOptions);
+        await client.connect();
+        await client.end();
+        return {
+          success: true,
+          message: `Connected to PostgreSQL at ${config.host}:${config.port}`,
+        };
+      } else if (config.type === 'mongodb') {
+        const { MongoClient } = await import('mongodb').catch(() => ({
+          MongoClient: null,
+        }));
+        if (!MongoClient) {
+          return {
+            success: false,
+            message: 'mongodb driver not installed. Run: bun add mongodb',
+          };
+        }
+        if (dto.url) {
+          const client = new MongoClient(dto.url, {
+            serverSelectionTimeoutMS: 5000,
+          });
+          await client.connect();
+          await client.close();
+          return { success: true, message: `Connected to MongoDB` };
+        }
+        const auth = config.username
+          ? `${config.username}${config.password ? `:${config.password}` : ''}@`
+          : '';
+        const uri = `mongodb://${auth}${config.host}:${config.port}/${config.database}`;
+        const client = new MongoClient(uri, { serverSelectionTimeoutMS: 5000 });
+        await client.connect();
+        await client.close();
+        return {
+          success: true,
+          message: `Connected to MongoDB at ${config.host}:${config.port}`,
+        };
+      }
+      return { success: false, message: 'Unsupported database type' };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Connection failed' };
+    }
+  }
+}

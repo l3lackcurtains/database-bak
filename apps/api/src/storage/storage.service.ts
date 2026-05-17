@@ -1,0 +1,170 @@
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { JsonStore } from '../common/json.store';
+import {
+  S3Client,
+  HeadBucketCommand,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { StorageEntity } from '../entities/storage.entity';
+import { CreateStorageDto, UpdateStorageDto } from './storage.types';
+
+function normalizeEndpoint(endpoint: string): string {
+  if (!endpoint) return endpoint;
+  if (/^https?:\/\//i.test(endpoint)) return endpoint;
+  return `https://${endpoint}`;
+}
+
+@Injectable()
+export class StorageService {
+  constructor(private store: JsonStore) {}
+
+  async findAll(): Promise<StorageEntity[]> {
+    return this.store.getAll<StorageEntity>('storage');
+  }
+
+  async findOne(id: string): Promise<StorageEntity | null> {
+    return this.store.getById<StorageEntity>('storage', id) || null;
+  }
+
+  async getDefault(): Promise<StorageEntity | null> {
+    return (
+      this.store.findBy('storage', (s: StorageEntity) => s.isDefault)[0] || null
+    );
+  }
+
+  async create(dto: CreateStorageDto): Promise<StorageEntity> {
+    const count = this.store.count('storage');
+    const id = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
+    const entity: StorageEntity = {
+      id,
+      name: dto.name,
+      provider: dto.provider,
+      endpoint: dto.endpoint,
+      region: dto.region || 'us-east-1',
+      bucket: dto.bucket,
+      accessKeyId: dto.accessKeyId,
+      secretAccessKey: dto.secretAccessKey,
+      pathPrefix: dto.pathPrefix || 'backups/',
+      isDefault: count === 0,
+      status: 'disconnected',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    return this.store.create('storage', entity);
+  }
+
+  async update(
+    id: string,
+    dto: UpdateStorageDto,
+  ): Promise<StorageEntity | null> {
+    return this.store.update<StorageEntity>('storage', id, {
+      ...dto,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  async remove(id: string): Promise<void> {
+    const jobs = this.store.findBy('jobs', (job: { storageId?: string }) => job.storageId === id);
+    if (jobs.length > 0) {
+      throw new BadRequestException('Cannot delete storage while jobs reference it');
+    }
+    this.store.delete('storage', id);
+  }
+
+  async setDefault(id: string): Promise<StorageEntity | null> {
+    const all = this.store.getAll<StorageEntity>('storage');
+    for (const s of all) {
+      if (s.isDefault) {
+        this.store.update<StorageEntity>('storage', s.id, {
+          isDefault: false,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+    return this.store.update<StorageEntity>('storage', id, {
+      isDefault: true,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  async testConnection(
+    dto: CreateStorageDto,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const client = this.createS3Client({
+        endpoint: normalizeEndpoint(dto.endpoint),
+        region: dto.region || 'us-east-1',
+        accessKeyId: dto.accessKeyId,
+        secretAccessKey: dto.secretAccessKey,
+      });
+      await client.send(new HeadBucketCommand({ Bucket: dto.bucket }));
+      return { success: true, message: `Connected to bucket "${dto.bucket}"` };
+    } catch (error: any) {
+      return { success: false, message: error.message || 'Connection failed' };
+    }
+  }
+
+  createS3Client(config: {
+    endpoint: string;
+    region: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+  }): S3Client {
+    return new S3Client({
+      endpoint: normalizeEndpoint(config.endpoint),
+      region: config.region,
+      credentials: {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
+      },
+      forcePathStyle: true,
+    });
+  }
+
+  async uploadFile(
+    storage: StorageEntity,
+    key: string,
+    data: Buffer,
+  ): Promise<{ key: string; size: number }> {
+    const client = this.createS3Client(storage);
+    const fullKey = `${storage.pathPrefix}${key}`;
+    await client.send(
+      new PutObjectCommand({
+        Bucket: storage.bucket,
+        Key: fullKey,
+        Body: data,
+        ContentType: 'application/gzip',
+      }),
+    );
+    return { key: fullKey, size: data.length };
+  }
+
+  async generateDownloadUrl(
+    storage: StorageEntity,
+    key: string,
+  ): Promise<{ url: string; expiresAt: string }> {
+    const client = this.createS3Client(storage);
+    const command = new GetObjectCommand({ Bucket: storage.bucket, Key: key });
+    const url = await getSignedUrl(client, command, { expiresIn: 3600 });
+    return { url, expiresAt: new Date(Date.now() + 3600000).toISOString() };
+  }
+
+  async deleteFile(storage: StorageEntity, key: string): Promise<void> {
+    const client = this.createS3Client(storage);
+    await client.send(
+      new DeleteObjectCommand({ Bucket: storage.bucket, Key: key }),
+    );
+  }
+
+  async getFileSize(storage: StorageEntity, key: string): Promise<number> {
+    const client = this.createS3Client(storage);
+    const response = await client.send(
+      new HeadObjectCommand({ Bucket: storage.bucket, Key: key }),
+    );
+    return response.ContentLength || 0;
+  }
+}
