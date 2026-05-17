@@ -11,22 +11,25 @@ import { formatDate, formatDuration } from '@/lib/utils';
 import { CalendarClock, Clock, Database, Edit3, Pause, Play, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
+type JobsTab = 'scheduled' | 'manual';
+
 export function JobsPage() {
   const [jobs, setJobs] = useState<BackupJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [now, setNow] = useState(0);
+  const [activeTab, setActiveTab] = useState<JobsTab>('scheduled');
 
   const fetchJobs = useCallback(() => {
-    jobsApi.list({ page, limit: 20 })
+    jobsApi.list({ page, limit: 20, source: activeTab })
       .then((res) => {
         setJobs(res.data);
         setTotalPages(res.totalPages);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [activeTab, page]);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
   useEffect(() => {
@@ -58,6 +61,12 @@ export function JobsPage() {
     if (!confirm('Delete this job record?')) return;
     await jobsApi.delete(id);
     fetchJobs();
+  };
+
+  const handleTabChange = (tab: JobsTab) => {
+    setLoading(true);
+    setActiveTab(tab);
+    setPage(1);
   };
 
   const statusBadge = (status: string) => {
@@ -115,7 +124,7 @@ export function JobsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Backup Jobs</h1>
-          <p className="text-muted-foreground">Monitor and manage backup, restore, and migration jobs</p>
+          <p className="text-muted-foreground">Monitor scheduled work separately from one-time manual runs</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
           <Button variant="outline" onClick={fetchJobs}>
@@ -131,11 +140,31 @@ export function JobsPage() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Jobs</CardTitle></CardHeader>
+        <CardHeader className="space-y-4">
+          <CardTitle>{activeTab === 'manual' ? 'Manual runs' : 'Jobs'}</CardTitle>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={activeTab === 'scheduled' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleTabChange('scheduled')}
+            >
+              Scheduled & active jobs
+            </Button>
+            <Button
+              variant={activeTab === 'manual' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleTabChange('manual')}
+            >
+              Manual runs
+            </Button>
+          </div>
+        </CardHeader>
         <CardContent>
           {jobs.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
-              No jobs yet. Create your first backup job.
+              {activeTab === 'manual'
+                ? 'No manual backup runs yet. Run a manual backup to see it here.'
+                : 'No scheduled jobs yet. Create your first backup job.'}
             </p>
           ) : (
             <>

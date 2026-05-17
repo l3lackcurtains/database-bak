@@ -52,12 +52,13 @@ export const snapshotsApi = {
 };
 
 export const jobsApi = {
-  list: (params?: { page?: number; limit?: number; status?: string; type?: string }) => {
+  list: (params?: { page?: number; limit?: number; status?: string; type?: string; source?: 'manual' | 'scheduled' }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.status) query.set('status', params.status);
     if (params?.type) query.set('type', params.type);
+    if (params?.source) query.set('source', params.source);
     const qs = query.toString();
     return api.get<PaginatedResponse<BackupJob>>(`/jobs${qs ? `?${qs}` : ''}`);
   },
@@ -104,4 +105,11 @@ export const migrationApi = {
 
 export const dashboardApi = {
   stats: () => api.get<DashboardStats>('/dashboard/stats'),
+};
+
+export const authApi = {
+  login: (data: { username: string; password: string }) =>
+    api.post<{ user: { username: string; role: 'admin' } }>('/auth/login', data),
+  logout: () => api.post<{ success: boolean }>('/auth/logout'),
+  me: () => api.get<{ user: { username: string; role: 'admin' } }>('/auth/me'),
 };

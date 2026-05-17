@@ -1,41 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
+import { authConfigured, getUserFromRequest } from './auth/session';
 
-function unauthorized(res: Response) {
-  res.setHeader('WWW-Authenticate', 'Basic realm="Crumet Sync", charset="UTF-8"');
-  res.status(401).send('Authentication required');
-}
-
-function basicAuth(req: Request, res: Response, next: NextFunction) {
-  const username = process.env.DASHBOARD_USERNAME;
-  const password = process.env.DASHBOARD_PASSWORD;
-
-  if (!username || !password || req.method === 'OPTIONS') {
+function sessionAuth(req: Request, res: Response, next: NextFunction) {
+  if (!authConfigured() || req.method === 'OPTIONS' || req.path === '/api/auth/login') {
     next();
     return;
   }
 
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Basic ')) {
-    unauthorized(res);
-    return;
-  }
-
-  const credentials = Buffer.from(header.slice(6), 'base64')
-    .toString('utf8')
-  const separator = credentials.indexOf(':');
-
-  if (separator === -1) {
-    unauthorized(res);
-    return;
-  }
-
-  const providedUsername = credentials.slice(0, separator);
-  const providedPassword = credentials.slice(separator + 1);
-
-  if (providedUsername !== username || providedPassword !== password) {
-    unauthorized(res);
+  if (!getUserFromRequest(req)) {
+    res.status(401).json({ message: 'Authentication required', statusCode: 401, error: 'Unauthorized' });
     return;
   }
 
@@ -57,7 +32,7 @@ async function bootstrap() {
   });
 
   app.setGlobalPrefix('api');
-  app.use(basicAuth);
+  app.use(sessionAuth);
 
   const port = process.env.PORT || 3000;
   await app.listen(port);

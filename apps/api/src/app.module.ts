@@ -7,12 +7,14 @@ import { SnapshotModule } from './snapshot/snapshot.module';
 import { JobModule } from './job/job.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CommonModule } from './common/common.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     CommonModule,
+    AuthModule,
     DatabaseModule,
     StorageModule,
     SnapshotModule,

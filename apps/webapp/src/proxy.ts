@@ -1,38 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-function unauthorized() {
-  return new NextResponse('Authentication required', {
-    status: 401,
-    headers: {
-      'WWW-Authenticate': 'Basic realm="Crumet Sync", charset="UTF-8"',
-    },
-  });
+const SESSION_COOKIE = 'crumet_session';
+
+function authConfigured() {
+  return Boolean(process.env.DASHBOARD_USERNAME && process.env.DASHBOARD_PASSWORD);
 }
 
-function isAuthorized(request: NextRequest) {
-  const username = process.env.DASHBOARD_USERNAME;
-  const password = process.env.DASHBOARD_PASSWORD;
+function getSecret() {
+  return process.env.AUTH_SECRET || process.env.DASHBOARD_PASSWORD || 'dev-session-secret';
+}
 
-  if (!username || !password) return true;
+function base64Url(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
 
-  const header = request.headers.get('authorization');
-  if (!header?.startsWith('Basic ')) return false;
+async function sign(payload: string) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(getSecret()),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  return base64Url(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload)));
+}
+
+async function hasValidSession(request: NextRequest) {
+  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  if (!token) return false;
+
+  const [payload, signature] = token.split('.');
+  if (!payload || !signature || signature !== await sign(payload)) return false;
 
   try {
-    const credentials = atob(header.slice(6));
-    const separator = credentials.indexOf(':');
-    if (separator === -1) return false;
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const session = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))) as {
+      username?: string;
+      role?: string;
+      exp?: number;
+    };
 
-    const providedUsername = credentials.slice(0, separator);
-    const providedPassword = credentials.slice(separator + 1);
-    return providedUsername === username && providedPassword === password;
+    return Boolean(
+      session.username
+      && session.role === 'admin'
+      && session.exp
+      && session.exp >= Math.floor(Date.now() / 1000),
+    );
   } catch {
     return false;
   }
 }
 
-export function proxy(request: NextRequest) {
-  if (!isAuthorized(request)) return unauthorized();
+function unauthorizedJson() {
+  return NextResponse.json(
+    { message: 'Authentication required', statusCode: 401, error: 'Unauthorized' },
+    { status: 401 },
+  );
+}
+
+export async function proxy(request: NextRequest) {
+  if (!authConfigured()) return NextResponse.next();
+
+  const { pathname } = request.nextUrl;
+  const isLoginPage = pathname === '/login';
+  const isAuthApi = pathname === '/api/auth/login' || pathname === '/api/auth/logout';
+  const isApi = pathname.startsWith('/api/');
+
+  if (isAuthApi) return NextResponse.next();
+
+  const authenticated = await hasValidSession(request);
+
+  if (isLoginPage && authenticated) {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  if (!authenticated && !isLoginPage) {
+    if (isApi) return unauthorizedJson();
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
   return NextResponse.next();
 }
 

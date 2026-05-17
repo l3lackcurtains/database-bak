@@ -25,11 +25,17 @@ export class JobService {
     limit: number = 20,
     status?: string,
     type?: string,
+    source?: string,
   ) {
     this.ensureScheduledJobsHaveNextRun();
     let jobs = this.store.getAll<JobEntity>('jobs');
     if (status) jobs = jobs.filter((j) => j.status === status);
     if (type) jobs = jobs.filter((j) => j.type === type);
+    if (source === 'manual') {
+      jobs = jobs.filter((j) => j.type === 'backup' && !j.schedule);
+    } else if (source === 'scheduled') {
+      jobs = jobs.filter((j) => !(j.type === 'backup' && !j.schedule));
+    }
     const total = jobs.length;
     const totalPages = Math.ceil(total / limit);
     const start = (page - 1) * limit;
