@@ -32,20 +32,92 @@ export class JobService {
     if (status) jobs = jobs.filter((j) => j.status === status);
     if (type) jobs = jobs.filter((j) => j.type === type);
     if (source === 'manual') {
-      jobs = jobs.filter((j) => j.type === 'backup' && !j.schedule);
+      jobs = jobs.filter((j) => !j.schedule);
     } else if (source === 'scheduled') {
-      jobs = jobs.filter((j) => !(j.type === 'backup' && !j.schedule));
+      jobs = jobs.filter((j) => !!j.schedule);
     }
     const total = jobs.length;
     const totalPages = Math.ceil(total / limit);
     const start = (page - 1) * limit;
-    const data = jobs.slice(start, start + limit);
+    const data = jobs.slice(start, start + limit).map((job) => this.withDetails(job));
     return { data, total, page, limit, totalPages };
   }
 
   async findOne(id: string): Promise<JobEntity | null> {
     this.ensureScheduledJobsHaveNextRun();
-    return this.store.getById<JobEntity>('jobs', id) || null;
+    const job = this.store.getById<JobEntity>('jobs', id) || null;
+    return job ? this.withDetails(job) : null;
+  }
+
+  private databaseSummary(id?: string | null) {
+    if (!id) return null;
+    const db = this.store.getById<any>('databases', id);
+    if (!db) return null;
+    return {
+      id: db.id,
+      name: db.name,
+      type: db.type,
+      host: db.host,
+      port: db.port,
+      database: db.database,
+      username: db.username,
+      ssl: db.ssl,
+      url: db.url ? db.url.replace(/:\/\/([^:@]+):([^@]+)@/, '://$1:***@') : undefined,
+    };
+  }
+
+  private storageSummary(id?: string | null) {
+    if (!id) return null;
+    const storage = this.store.getById<any>('storage', id);
+    if (!storage) return null;
+    return {
+      id: storage.id,
+      name: storage.name,
+      provider: storage.provider,
+      endpoint: storage.endpoint,
+      region: storage.region,
+      bucket: storage.bucket,
+      pathPrefix: storage.pathPrefix,
+    };
+  }
+
+  private withDetails(job: JobEntity): JobEntity {
+    const snapshotId = job.options?.snapshotId || job.snapshotId;
+    const snapshot = snapshotId ? this.store.getById<any>('snapshots', snapshotId) : null;
+    const sourceDatabase = snapshot
+      ? this.databaseSummary(snapshot.databaseId) || {
+          id: snapshot.databaseId,
+          name: snapshot.databaseName,
+          type: snapshot.databaseType,
+          database: snapshot.metadata?.database,
+        }
+      : this.databaseSummary(job.databaseId);
+    const destinationDatabase = job.type === 'restore'
+      ? this.databaseSummary(job.options?.targetDatabaseId || job.databaseId)
+      : null;
+
+    return {
+      ...job,
+      details: {
+        sourceDatabase,
+        destinationDatabase,
+        storage: this.storageSummary(job.storageId),
+        snapshot: snapshot
+          ? {
+              id: snapshot.id,
+              databaseName: snapshot.databaseName,
+              databaseType: snapshot.databaseType,
+              storageKey: snapshot.storageKey,
+              size: snapshot.size,
+              compressedSize: snapshot.compressedSize,
+              checksum: snapshot.checksum,
+              createdAt: snapshot.createdAt,
+              completedAt: snapshot.completedAt,
+              metadata: snapshot.metadata,
+            }
+          : null,
+      },
+    } as JobEntity;
   }
 
   private nextRunFrom(

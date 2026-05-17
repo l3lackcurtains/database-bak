@@ -111,6 +111,55 @@ export interface BackupJob {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  details?: {
+    sourceDatabase: JobDatabaseDetails | null;
+    destinationDatabase: JobDatabaseDetails | null;
+    storage: JobStorageDetails | null;
+    snapshot: JobSnapshotDetails | null;
+  };
+}
+
+export interface JobDatabaseDetails {
+  id: string;
+  name: string;
+  type: string;
+  host?: string;
+  port?: number;
+  database?: string;
+  username?: string;
+  ssl?: boolean;
+  url?: string;
+}
+
+export interface JobStorageDetails {
+  id: string;
+  name: string;
+  provider: string;
+  endpoint: string;
+  region: string;
+  bucket: string;
+  pathPrefix: string;
+}
+
+export interface JobSnapshotDetails {
+  id: string;
+  databaseName: string;
+  databaseType: string;
+  storageKey: string;
+  size: number;
+  compressedSize: number;
+  checksum: string;
+  createdAt: string;
+  completedAt: string | null;
+  metadata?: {
+    version?: string;
+    database?: string;
+    collections?: string[];
+    tables?: string[];
+    recordCount?: number;
+    archive?: boolean;
+    gzip?: boolean;
+  };
 }
 
 export interface DashboardStats {

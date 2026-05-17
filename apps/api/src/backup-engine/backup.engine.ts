@@ -34,7 +34,7 @@ export class BackupEngine {
     });
   }
 
-  private async runCommandWithInput(command: string, args: string[], input: Buffer): Promise<void> {
+  private async runCommandWithInput(command: string, args: string[], input: Buffer): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn(command, args, { stdio: ['pipe', 'ignore', 'pipe'] });
       const stderr: Buffer[] = [];
@@ -48,11 +48,12 @@ export class BackupEngine {
         reject(error);
       });
       child.on('close', (code) => {
+        const stderrText = Buffer.concat(stderr).toString('utf-8').trim();
         if (code === 0) {
-          resolve();
+          resolve(stderrText);
           return;
         }
-        reject(new Error(Buffer.concat(stderr).toString('utf-8').trim() || `${command} exited with code ${code}`));
+        reject(new Error(stderrText || `${command} exited with code ${code}`));
       });
 
       child.stdin.end(input);
@@ -266,7 +267,23 @@ export class BackupEngine {
       args.push('--nsFrom', `${sourceDatabase}.*`, '--nsTo', `${db.database}.*`);
     }
 
-    await this.runCommandWithInput('mongorestore', args, archive);
+    const output = await this.runCommandWithInput('mongorestore', args, archive);
+    const expectedCollections = snapshot.metadata?.collections;
+    if (Array.isArray(expectedCollections) && expectedCollections.length > 0) {
+      const restoredMatch = output.match(/(\d+)\s+document\(s\) restored successfully/i);
+      if (restoredMatch && Number(restoredMatch[1]) === 0) {
+        throw new Error(`mongorestore completed but restored 0 documents into ${db.database}`);
+      }
+
+      const { MongoClient } = await import('mongodb');
+      const client = new MongoClient(uri, { serverSelectionTimeoutMS: 10000 });
+      await client.connect();
+      const restoredCollections = await client.db(db.database).listCollections().toArray();
+      await client.close();
+      if (restoredCollections.length === 0) {
+        throw new Error(`Restore completed but ${db.database} has no collections. Check the target MongoDB host and namespace mapping.`);
+      }
+    }
   }
 
   private async generateMockDump(db: any): Promise<{

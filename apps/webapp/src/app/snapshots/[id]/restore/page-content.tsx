@@ -2,7 +2,7 @@
 
 import { use, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, Plus, RotateCcw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Plus, RotateCcw, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -77,7 +77,7 @@ export function RestoreSnapshotPage({ params }: { params: Promise<{ id: string }
           encrypt: false,
         },
       });
-      router.push('/jobs');
+      router.push('/jobs?source=manual');
     } catch (err) {
       console.error(err);
       setError('Failed to create restore job.');
@@ -101,7 +101,9 @@ export function RestoreSnapshotPage({ params }: { params: Promise<{ id: string }
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Restore Snapshot</h1>
-          <p className="text-muted-foreground">Choose where this backup should be restored</p>
+          <p className="text-muted-foreground">
+            Restoring {snapshot.databaseName} from {formatDate(snapshot.createdAt)}
+          </p>
         </div>
         <Button variant="outline" onClick={() => router.push('/snapshots')}>
           <ArrowLeft className="h-4 w-4" /> Back
@@ -124,7 +126,7 @@ export function RestoreSnapshotPage({ params }: { params: Promise<{ id: string }
               <div>
                 <div className="flex items-center justify-between gap-3">
                   <label className="text-sm font-medium">Target Database</label>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setShowTargetForm((value) => !value)}>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setShowTargetForm(true)}>
                     <Plus className="h-4 w-4" /> Add Target DB
                   </Button>
                 </div>
@@ -180,16 +182,6 @@ export function RestoreSnapshotPage({ params }: { params: Promise<{ id: string }
                 </Button>
               </div>
             </form>
-            {showTargetForm && (
-              <DatabaseForm
-                defaultType={snapshot.databaseType}
-                onCancel={() => setShowTargetForm(false)}
-                onSuccess={async (database) => {
-                  await refreshDatabases(database?.id);
-                  setShowTargetForm(false);
-                }}
-              />
-            )}
           </CardContent>
         </Card>
 
@@ -225,6 +217,44 @@ export function RestoreSnapshotPage({ params }: { params: Promise<{ id: string }
           </CardContent>
         </Card>
       </div>
+
+      {showTargetForm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-target-db-title"
+          onMouseDown={() => setShowTargetForm(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-background shadow-xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div>
+                <h2 id="add-target-db-title" className="text-lg font-semibold">Add Target DB</h2>
+                <p className="text-sm text-muted-foreground">
+                  Add a {snapshot.databaseType} database connection for this restore.
+                </p>
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setShowTargetForm(false)}>
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </Button>
+            </div>
+            <div className="p-4">
+              <DatabaseForm
+                defaultType={snapshot.databaseType}
+                onCancel={() => setShowTargetForm(false)}
+                onSuccess={async (database) => {
+                  await refreshDatabases(database?.id);
+                  setShowTargetForm(false);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

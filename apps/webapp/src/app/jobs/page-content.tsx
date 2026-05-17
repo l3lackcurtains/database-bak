@@ -6,20 +6,20 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { jobsApi } from '@/lib/api-routes';
-import type { BackupJob } from '@/types';
+import type { BackupJob, JobDatabaseDetails } from '@/types';
 import { formatDate, formatDuration } from '@/lib/utils';
-import { CalendarClock, Clock, Database, Edit3, Pause, Play, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
+import { ArrowRight, CalendarClock, Clock, Database, Edit3, HardDrive, Pause, Play, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 type JobsTab = 'scheduled' | 'manual';
 
-export function JobsPage() {
+export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab }) {
   const [jobs, setJobs] = useState<BackupJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [now, setNow] = useState(0);
-  const [activeTab, setActiveTab] = useState<JobsTab>('scheduled');
+  const [activeTab, setActiveTab] = useState<JobsTab>(initialTab);
 
   const fetchJobs = useCallback(() => {
     jobsApi.list({ page, limit: 20, source: activeTab })
@@ -115,6 +115,11 @@ export function JobsPage() {
     return 'bg-muted-foreground';
   };
 
+  const databaseTarget = (db: JobDatabaseDetails | null | undefined) => {
+    if (!db) return 'Unknown database';
+    return `${db.name} (${db.host || 'unknown'}${db.port ? `:${db.port}` : ''}/${db.database || db.name})`;
+  };
+
   if (loading) {
     return <div className="flex h-96 items-center justify-center"><Spinner size="lg" /></div>;
   }
@@ -124,7 +129,7 @@ export function JobsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Backup Jobs</h1>
-          <p className="text-muted-foreground">Monitor scheduled work separately from one-time manual runs</p>
+          <p className="text-muted-foreground">Monitor scheduled work separately from one-time backup and restore runs</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
           <Button variant="outline" onClick={fetchJobs}>
@@ -141,21 +146,21 @@ export function JobsPage() {
 
       <Card>
         <CardHeader className="space-y-4">
-          <CardTitle>{activeTab === 'manual' ? 'Manual runs' : 'Jobs'}</CardTitle>
+          <CardTitle>{activeTab === 'manual' ? 'One-time runs' : 'Scheduled jobs'}</CardTitle>
           <div className="flex flex-wrap gap-2">
             <Button
               variant={activeTab === 'scheduled' ? 'default' : 'outline'}
               size="sm"
               onClick={() => handleTabChange('scheduled')}
             >
-              Scheduled & active jobs
+              Scheduled jobs
             </Button>
             <Button
               variant={activeTab === 'manual' ? 'default' : 'outline'}
               size="sm"
               onClick={() => handleTabChange('manual')}
             >
-              Manual runs
+              One-time runs
             </Button>
           </div>
         </CardHeader>
@@ -163,7 +168,7 @@ export function JobsPage() {
           {jobs.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
               {activeTab === 'manual'
-                ? 'No manual backup runs yet. Run a manual backup to see it here.'
+                ? 'No one-time backup or restore runs yet.'
                 : 'No scheduled jobs yet. Create your first backup job.'}
             </p>
           ) : (
@@ -182,12 +187,29 @@ export function JobsPage() {
                         </div>
 
                         <div className="grid gap-3 text-sm md:grid-cols-2">
-                          <div className="min-w-0 space-y-1">
-                            <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
-                              <Database className="h-3.5 w-3.5" /> Database
+                          {job.type === 'restore' ? (
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+                                <Database className="h-3.5 w-3.5" /> Restore path
+                              </div>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="truncate" title={databaseTarget(job.details?.sourceDatabase)}>
+                                  {job.details?.sourceDatabase?.name || job.details?.snapshot?.databaseName || 'Source'}
+                                </span>
+                                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                <span className="truncate" title={databaseTarget(job.details?.destinationDatabase)}>
+                                  {job.details?.destinationDatabase?.name || job.databaseName}
+                                </span>
+                              </div>
                             </div>
-                            <div className="truncate" title={job.databaseName}>{job.databaseName}</div>
-                          </div>
+                          ) : (
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+                                <Database className="h-3.5 w-3.5" /> Source
+                              </div>
+                              <div className="truncate" title={databaseTarget(job.details?.sourceDatabase)}>{job.databaseName}</div>
+                            </div>
+                          )}
                           <div className="min-w-0 space-y-1">
                             <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
                               <CalendarClock className="h-3.5 w-3.5" /> Schedule
@@ -211,9 +233,15 @@ export function JobsPage() {
                             )}
                           </div>
                           <div className="min-w-0 space-y-1">
-                            <div className="text-xs font-medium uppercase text-muted-foreground">History</div>
-                            <div>{job.runCount || 0} runs</div>
-                            <div className="text-xs text-muted-foreground">{job.failedRunCount || 0} failed</div>
+                            <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+                              <HardDrive className="h-3.5 w-3.5" /> Storage
+                            </div>
+                            <div className="truncate" title={job.details?.storage?.bucket || job.storageId}>
+                              {job.details?.storage?.name || job.storageId}
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground" title={job.details?.snapshot?.storageKey || undefined}>
+                              {job.details?.storage?.bucket || 'Storage bucket'}
+                            </div>
                           </div>
                         </div>
 

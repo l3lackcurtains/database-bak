@@ -3,14 +3,14 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, CalendarClock, Clock, Database, Edit3, HardDrive, Play, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarClock, Clock, Database, Edit3, HardDrive, Play, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { jobsApi } from '@/lib/api-routes';
-import { formatDate, formatDuration } from '@/lib/utils';
-import type { BackupJob } from '@/types';
+import { formatBytes, formatDate, formatDuration } from '@/lib/utils';
+import type { BackupJob, JobDatabaseDetails } from '@/types';
 
 function statusBadge(status: string) {
   const variants: Record<string, 'success' | 'destructive' | 'warning' | 'secondary'> = {
@@ -41,6 +41,20 @@ function nextRunText(job: BackupJob) {
   if (!job.schedule.nextRunAt) return 'Next run is being calculated';
   const diff = new Date(job.schedule.nextRunAt).getTime() - Date.now();
   return diff <= 0 ? 'Due now' : `Runs in ${formatDuration(diff)}`;
+}
+
+function databaseTarget(db: JobDatabaseDetails | null | undefined) {
+  if (!db) return 'Unknown database';
+  return `${db.host || 'unknown'}${db.port ? `:${db.port}` : ''}/${db.database || db.name}`;
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b py-2 last:border-0">
+      <div className="text-muted-foreground">{label}</div>
+      <div className="max-w-[220px] break-all text-right font-medium">{value}</div>
+    </div>
+  );
 }
 
 export function JobDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -170,6 +184,55 @@ export function JobDetailsPage({ params }: { params: Promise<{ id: string }> }) 
             </div>
           </CardContent>
         </Card>
+
+        {job.type === 'restore' && (
+          <Card>
+            <CardHeader><CardTitle>Restore Details</CardTitle></CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-start">
+                <div className="rounded-md border p-3">
+                  <div className="mb-2 flex items-center gap-2 font-medium">
+                    <Database className="h-4 w-4 text-muted-foreground" /> Source
+                  </div>
+                  <DetailRow label="Name" value={job.details?.sourceDatabase?.name || job.details?.snapshot?.databaseName || 'Unknown'} />
+                  <DetailRow label="Target" value={databaseTarget(job.details?.sourceDatabase)} />
+                  <DetailRow label="Type" value={job.details?.sourceDatabase?.type || job.details?.snapshot?.databaseType || job.type} />
+                  <DetailRow label="Snapshot" value={job.details?.snapshot?.id || job.options.snapshotId || 'Unknown'} />
+                  {job.details?.snapshot?.metadata?.collections && (
+                    <DetailRow label="Collections" value={job.details.snapshot.metadata.collections.length} />
+                  )}
+                </div>
+
+                <div className="hidden pt-12 md:block">
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+
+                <div className="rounded-md border p-3">
+                  <div className="mb-2 flex items-center gap-2 font-medium">
+                    <Database className="h-4 w-4 text-muted-foreground" /> Destination
+                  </div>
+                  <DetailRow label="Name" value={job.details?.destinationDatabase?.name || job.databaseName} />
+                  <DetailRow label="Target" value={databaseTarget(job.details?.destinationDatabase)} />
+                  <DetailRow label="Type" value={job.details?.destinationDatabase?.type || job.type} />
+                  <DetailRow label="Clean first" value={job.options.cleanBeforeRestore ? 'Yes' : 'No'} />
+                </div>
+              </div>
+
+              <div className="rounded-md border p-3">
+                <div className="mb-2 flex items-center gap-2 font-medium">
+                  <HardDrive className="h-4 w-4 text-muted-foreground" /> Storage
+                </div>
+                <DetailRow label="Name" value={job.details?.storage?.name || job.storageId} />
+                <DetailRow label="Bucket" value={job.details?.storage?.bucket || 'Unknown'} />
+                <DetailRow label="Endpoint" value={job.details?.storage?.endpoint || 'Unknown'} />
+                <DetailRow label="Object" value={job.details?.snapshot?.storageKey || 'Unknown'} />
+                {job.details?.snapshot?.compressedSize !== undefined && (
+                  <DetailRow label="Size" value={formatBytes(job.details.snapshot.compressedSize)} />
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader><CardTitle>Configuration</CardTitle></CardHeader>
