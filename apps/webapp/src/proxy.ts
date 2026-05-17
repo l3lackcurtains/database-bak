@@ -6,36 +6,12 @@ function authConfigured() {
   return Boolean(process.env.DASHBOARD_USERNAME && process.env.DASHBOARD_PASSWORD);
 }
 
-function getSecret() {
-  return process.env.AUTH_SECRET || process.env.DASHBOARD_PASSWORD || 'dev-session-secret';
-}
-
-function base64Url(buffer: ArrayBuffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-}
-
-async function sign(payload: string) {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(getSecret()),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  return base64Url(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload)));
-}
-
-async function hasValidSession(request: NextRequest) {
+function hasSession(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (!token) return false;
 
-  const [payload, signature] = token.split('.');
-  if (!payload || !signature || signature !== await sign(payload)) return false;
+  const [payload] = token.split('.');
+  if (!payload) return false;
 
   try {
     const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
@@ -45,12 +21,7 @@ async function hasValidSession(request: NextRequest) {
       exp?: number;
     };
 
-    return Boolean(
-      session.username
-      && session.role === 'admin'
-      && session.exp
-      && session.exp >= Math.floor(Date.now() / 1000),
-    );
+    return Boolean(session.exp && session.exp >= Math.floor(Date.now() / 1000));
   } catch {
     return false;
   }
@@ -73,7 +44,7 @@ export async function proxy(request: NextRequest) {
 
   if (isAuthApi) return NextResponse.next();
 
-  const authenticated = await hasValidSession(request);
+  const authenticated = hasSession(request);
 
   if (isLoginPage && authenticated) {
     return NextResponse.redirect(new URL('/', request.url));

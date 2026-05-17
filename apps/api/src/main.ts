@@ -4,7 +4,9 @@ import { AppModule } from './app.module';
 import { authConfigured, getUserFromRequest } from './auth/session';
 
 function sessionAuth(req: Request, res: Response, next: NextFunction) {
-  if (!authConfigured() || req.method === 'OPTIONS' || req.path === '/api/auth/login') {
+  const path = req.path.replace(/^\/api/, '');
+
+  if (!authConfigured() || req.method === 'OPTIONS' || path === '/auth/login') {
     next();
     return;
   }

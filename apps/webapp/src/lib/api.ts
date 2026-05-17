@@ -33,6 +33,7 @@ async function fetchWithTimeout(
 async function request<T>(path: string, options: RequestInitWithTimeout = {}): Promise<T> {
   const url = `${API_URL}${path}`;
   const response = await fetchWithTimeout(url, {
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
   });
