@@ -9,6 +9,8 @@ import {
   HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { Upload } from '@aws-sdk/lib-storage';
+import { Readable } from 'stream';
 import { StorageEntity } from '../entities/storage.entity';
 import { CreateStorageDto, UpdateStorageDto } from './storage.types';
 
@@ -128,19 +130,23 @@ export class StorageService {
   async uploadFile(
     storage: StorageEntity,
     key: string,
-    data: Buffer,
-  ): Promise<{ key: string; size: number }> {
+    data: Buffer | Readable,
+  ): Promise<{ key: string }> {
     const client = this.createS3Client(storage);
     const fullKey = `${storage.pathPrefix}${key}`;
-    await client.send(
-      new PutObjectCommand({
+    
+    const upload = new Upload({
+      client,
+      params: {
         Bucket: storage.bucket,
         Key: fullKey,
         Body: data,
         ContentType: 'application/gzip',
-      }),
-    );
-    return { key: fullKey, size: data.length };
+      },
+    });
+
+    await upload.done();
+    return { key: fullKey };
   }
 
   async generateDownloadUrl(
@@ -153,23 +159,14 @@ export class StorageService {
     return { url, expiresAt: new Date(Date.now() + 3600000).toISOString() };
   }
 
-  async downloadFile(storage: StorageEntity, key: string): Promise<Buffer> {
+  async downloadFileStream(storage: StorageEntity, key: string): Promise<Readable> {
     const client = this.createS3Client(storage);
     const response = await client.send(
       new GetObjectCommand({ Bucket: storage.bucket, Key: key }),
     );
     const body = response.Body;
-    if (!body) return Buffer.alloc(0);
-
-    if ('transformToByteArray' in body && typeof body.transformToByteArray === 'function') {
-      return Buffer.from(await body.transformToByteArray());
-    }
-
-    const chunks: Buffer[] = [];
-    for await (const chunk of body as AsyncIterable<Uint8Array>) {
-      chunks.push(Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks);
+    if (!body) throw new Error('File not found or empty body');
+    return body as Readable;
   }
 
   async deleteFile(storage: StorageEntity, key: string): Promise<void> {

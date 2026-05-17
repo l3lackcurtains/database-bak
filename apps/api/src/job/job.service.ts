@@ -461,8 +461,10 @@ export class JobService {
     const uploadResult = await this.storageService.uploadFile(
       storage,
       key,
-      dumpResult.data,
+      dumpResult.stream,
     );
+
+    const uploadedSize = await this.storageService.getFileSize(storage, uploadResult.key);
 
     this.store.update<JobEntity>('jobs', jobId, {
       progress: 90,
@@ -471,9 +473,9 @@ export class JobService {
 
     await this.snapshotService.update(snapshot.id, {
       storageKey: uploadResult.key,
-      size: dumpResult.size,
-      compressedSize: uploadResult.size,
-      checksum: dumpResult.checksum,
+      size: uploadedSize,
+      compressedSize: uploadedSize,
+      checksum: 'streamed',
       status: 'completed',
       completedAt: new Date().toISOString(),
       metadata: {
@@ -506,13 +508,13 @@ export class JobService {
       progress: 30,
       currentStep: 'Fetching snapshot from storage',
     });
-    const archive = await this.storageService.downloadFile(storage, snapshot.storageKey);
+    const archiveStream = await this.storageService.downloadFileStream(storage, snapshot.storageKey);
 
     this.store.update<JobEntity>('jobs', jobId, {
       progress: 70,
       currentStep: 'Restoring database',
     });
-    await this.backupEngine.restoreDatabase(db, snapshot, archive, {
+    await this.backupEngine.restoreDatabase(db, snapshot, archiveStream, {
       cleanBeforeRestore: job.options?.cleanBeforeRestore,
     });
 

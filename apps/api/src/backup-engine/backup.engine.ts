@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { gzipSync } from 'zlib';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
+import { Readable, Transform, PassThrough } from 'stream';
+import * as crypto from 'crypto';
 
 const execAsync = promisify(exec);
 
@@ -9,44 +11,39 @@ const execAsync = promisify(exec);
 export class BackupEngine {
   private readonly logger = new Logger(BackupEngine.name);
 
-  private async runCommandToBuffer(command: string, args: string[]): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-      const stdout: Buffer[] = [];
-      const stderr: Buffer[] = [];
+  private runCommandToStream(command: string, args: string[]): Readable {
+    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const stderr: Buffer[] = [];
 
-      child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
-      child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
-      child.on('error', (error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') {
-          reject(new Error(`${command} is not installed or not available in PATH`));
-          return;
-        }
-        reject(error);
-      });
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve(Buffer.concat(stdout));
-          return;
-        }
-        reject(new Error(Buffer.concat(stderr).toString('utf-8').trim() || `${command} exited with code ${code}`));
-      });
+    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+    
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      this.logger.error(`Command ${command} failed to start:`, error);
+      child.stdout.destroy(error);
     });
+
+    child.on('close', (code) => {
+      if (code !== 0) {
+        const errorMsg = Buffer.concat(stderr).toString('utf-8').trim() || `${command} exited with code ${code}`;
+        this.logger.error(`Command ${command} failed: ${errorMsg}`);
+        child.stdout.destroy(new Error(errorMsg));
+      }
+    });
+
+    return child.stdout;
   }
 
-  private async runCommandWithInput(command: string, args: string[], input: Buffer): Promise<string> {
+  private async runCommandWithStreamInput(command: string, args: string[], inputStream: Readable): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn(command, args, { stdio: ['pipe', 'ignore', 'pipe'] });
       const stderr: Buffer[] = [];
 
       child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+      
       child.on('error', (error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') {
-          reject(new Error(`${command} is not installed or not available in PATH`));
-          return;
-        }
         reject(error);
       });
+      
       child.on('close', (code) => {
         const stderrText = Buffer.concat(stderr).toString('utf-8').trim();
         if (code === 0) {
@@ -56,7 +53,7 @@ export class BackupEngine {
         reject(new Error(stderrText || `${command} exited with code ${code}`));
       });
 
-      child.stdin.end(input);
+      inputStream.pipe(child.stdin);
     });
   }
 
@@ -73,19 +70,6 @@ export class BackupEngine {
     return `${base}/${queryString ? `?${queryString}` : ''}`;
   }
 
-  private packageDump(rawData: Buffer): {
-    data: Buffer;
-    size: number;
-    checksum: string;
-  } {
-    const compressedData = gzipSync(rawData);
-    return {
-      data: compressedData,
-      size: rawData.length,
-      checksum: this.computeChecksum(compressedData),
-    };
-  }
-
   async dumpDatabase(db: {
     type: string;
     host: string;
@@ -96,9 +80,7 @@ export class BackupEngine {
     url?: string;
     ssl?: boolean;
   }): Promise<{
-    data: Buffer;
-    size: number;
-    checksum: string;
+    stream: Readable;
     metadata: Record<string, any>;
   }> {
     this.logger.log(`Dumping ${db.type} database: ${db.database}`);
@@ -127,7 +109,7 @@ export class BackupEngine {
       databaseType: string;
       metadata?: Record<string, any> | null;
     },
-    archive: Buffer,
+    archiveStream: Readable,
     options: { cleanBeforeRestore?: boolean } = {},
   ): Promise<void> {
     if (db.type !== snapshot.databaseType) {
@@ -135,7 +117,12 @@ export class BackupEngine {
     }
 
     if (db.type === 'mongodb') {
-      await this.restoreMongoDB(db, snapshot, archive, options);
+      await this.restoreMongoDB(db, snapshot, archiveStream, options);
+      return;
+    }
+
+    if (db.type === 'postgres') {
+      await this.restorePostgres(db, snapshot, archiveStream, options);
       return;
     }
 
@@ -143,75 +130,72 @@ export class BackupEngine {
   }
 
   private async dumpPostgres(db: any): Promise<{
-    data: Buffer;
-    size: number;
-    checksum: string;
+    stream: Readable;
     metadata: Record<string, any>;
   }> {
-    try {
-      const { Client } = await import('pg');
-      const client = new Client(
-        db.url
-          ? {
-              connectionString: db.url,
-              ssl: db.ssl ? { rejectUnauthorized: false } : undefined,
-              connectionTimeoutMillis: 10000,
-            }
-          : {
-              host: db.host,
-              port: db.port,
-              database: db.database,
-              user: db.username,
-              password: db.password,
-              ssl: db.ssl ? { rejectUnauthorized: false } : false,
-              connectionTimeoutMillis: 10000,
-            },
-      );
-      await client.connect();
+    const { Client } = await import('pg');
+    const client = new Client(
+      db.url
+        ? {
+            connectionString: db.url,
+            ssl: db.ssl ? { rejectUnauthorized: false } : undefined,
+            connectionTimeoutMillis: 10000,
+          }
+        : {
+            host: db.host,
+            port: db.port,
+            database: db.database,
+            user: db.username,
+            password: db.password,
+            ssl: db.ssl ? { rejectUnauthorized: false } : false,
+            connectionTimeoutMillis: 10000,
+          },
+    );
+    await client.connect();
 
-      const tablesResult = await client.query(`
-        SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-      `);
-      const tables = tablesResult.rows.map((r: any) => r.table_name);
+    const tablesResult = await client.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+    `);
+    const tables = tablesResult.rows.map((r: any) => r.table_name);
+    const versionResult = await client.query('SELECT version()');
+    await client.end();
 
-      let totalRecords = 0;
-      for (const table of tables.slice(0, 5)) {
-        const count = await client.query(`SELECT COUNT(*) FROM "${table}"`);
-        totalRecords += parseInt(count.rows[0].count);
-      }
+    const uri = db.url || `postgresql://${db.username}:${db.password}@${db.host}:${db.port}/${db.database}`;
+    // Use custom format (-F c) which pg_restore can read natively and is compressed by default
+    const args = ['--dbname', uri, '-F', 'c'];
+    const stream = this.runCommandToStream('pg_dump', args);
 
-      const versionResult = await client.query('SELECT version()');
-      await client.end();
+    return {
+      stream,
+      metadata: {
+        version: versionResult.rows[0].version,
+        tables,
+        format: 'custom',
+        archive: true
+      },
+    };
+  }
 
-      const rawData = Buffer.from(
-        `-- PostgreSQL ${db.database} dump\n-- Tables: ${tables.join(', ')}\n-- Generated at ${new Date().toISOString()}\n`,
-      );
-      const dump = this.packageDump(rawData);
-
-      return {
-        data: dump.data,
-        size: dump.size,
-        checksum: dump.checksum,
-        metadata: {
-          version: versionResult.rows[0].version,
-          tables,
-          recordCount: totalRecords,
-        },
-      };
-    } catch (error: any) {
-      if (error.code === 'MODULE_NOT_FOUND') {
-        this.logger.warn('pg module not installed, generating mock dump');
-        return this.generateMockDump(db);
-      }
-      throw error;
+  private async restorePostgres(
+    db: any,
+    snapshot: { metadata?: Record<string, any> | null },
+    archiveStream: Readable,
+    options: { cleanBeforeRestore?: boolean },
+  ): Promise<void> {
+    const uri = db.url || `postgresql://${db.username}:${db.password}@${db.host}:${db.port}/${db.database}`;
+    
+    // pg_restore reads custom format
+    const args = ['--dbname', uri, '-d', db.database];
+    if (options.cleanBeforeRestore) {
+      args.push('--clean', '--if-exists');
     }
+
+    await this.runCommandWithStreamInput('pg_restore', args, archiveStream);
   }
 
   private async dumpMongoDB(db: any): Promise<{
-    data: Buffer;
-    size: number;
-    checksum: string;
+    stream: Readable;
     metadata: Record<string, any>;
   }> {
     try {
@@ -235,13 +219,10 @@ export class BackupEngine {
         args.push('--db', db.database);
       }
 
-      const archive = await this.runCommandToBuffer('mongodump', args);
-      const checksum = this.computeChecksum(archive);
+      const archiveStream = this.runCommandToStream('mongodump', args);
 
       return {
-        data: archive,
-        size: archive.length,
-        checksum,
+        stream: archiveStream,
         metadata: {
           version: 'mongodump',
           database: db.database,
@@ -252,8 +233,8 @@ export class BackupEngine {
       };
     } catch (error: any) {
       if (error.code === 'MODULE_NOT_FOUND') {
-        this.logger.warn('mongodb module not installed, generating mock dump');
-        return this.generateMockDump(db);
+        this.logger.warn('mongodb module not installed, generating mock stream');
+        return this.generateMockStream(db);
       }
       throw error;
     }
@@ -262,7 +243,7 @@ export class BackupEngine {
   private async restoreMongoDB(
     db: any,
     snapshot: { metadata?: Record<string, any> | null },
-    archive: Buffer,
+    archiveStream: Readable,
     options: { cleanBeforeRestore?: boolean },
   ): Promise<void> {
     const auth = db.username
@@ -294,7 +275,7 @@ export class BackupEngine {
       args.push('--nsFrom', `${sourceDatabase}.*`, '--nsTo', `${db.database}.*`);
     }
 
-    const output = await this.runCommandWithInput('mongorestore', args, archive);
+    const output = await this.runCommandWithStreamInput('mongorestore', args, archiveStream);
     const expectedCollections = snapshot.metadata?.collections;
     if (Array.isArray(expectedCollections) && expectedCollections.length > 0) {
       const restoredMatch = output.match(/(\d+)\s+document\(s\) restored successfully/i);
@@ -313,30 +294,20 @@ export class BackupEngine {
     }
   }
 
-  private async generateMockDump(db: any): Promise<{
-    data: Buffer;
-    size: number;
-    checksum: string;
+  private async generateMockStream(db: any): Promise<{
+    stream: Readable;
     metadata: Record<string, any>;
   }> {
     const rawData = Buffer.from(
       `-- ${db.type} ${db.database} dump (mock)\n-- Host: ${db.host}:${db.port}\n-- Generated at ${new Date().toISOString()}\n-- Note: Install '${db.type === 'postgres' ? 'pg' : 'mongodb'}' package for real dumps\n`,
     );
-    const dump = this.packageDump(rawData);
+    const compressedData = gzipSync(rawData);
+    const stream = new Readable();
+    stream.push(compressedData);
+    stream.push(null);
     return {
-      data: dump.data,
-      size: dump.size,
-      checksum: dump.checksum,
+      stream,
       metadata: { version: 'mock', tables: ['mock_table'], recordCount: 0 },
     };
-  }
-
-  private computeChecksum(data: Buffer): string {
-    const crypto = require('crypto');
-    return crypto
-      .createHash('sha256')
-      .update(data)
-      .digest('hex')
-      .substring(0, 16);
   }
 }
