@@ -28,6 +28,7 @@ export interface JobEntity {
     intervalsHours?: number[];
     cronExpression: string | null;
     nextRunAt: string | null;
+    nextRunReason?: string | null;
     timezone: string;
   } | null;
   options: {

@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { JsonStore } from '../common/json.store';
 import { JobEntity } from '../entities/job.entity';
 import { CreateJobDto, UpdateJobDto } from './job.types';
@@ -18,6 +20,7 @@ export class JobService {
     private storageService: StorageService,
     private snapshotService: SnapshotService,
     private backupEngine: BackupEngine,
+    @InjectQueue('jobs') private jobQueue: Queue,
   ) {}
 
   async findAll(
@@ -123,19 +126,23 @@ export class JobService {
   private nextRunFrom(
     schedule: JobEntity['schedule'],
     from: Date = new Date(),
-  ): string | null {
+  ): { time: string; reason: string } | null {
     if (!schedule) return null;
     const intervalCandidates = (schedule.intervalsHours?.length ? schedule.intervalsHours : schedule.intervalHours ? [schedule.intervalHours] : [])
       .filter((interval) => interval > 0)
-      .map((interval) => new Date(from.getTime() + interval * 60 * 60 * 1000).toISOString());
+      .map((interval) => ({ time: new Date(from.getTime() + interval * 60 * 60 * 1000).toISOString(), reason: `every-${interval}-hours` }));
+    
     const frequencies = schedule.frequencies?.length ? schedule.frequencies : [schedule.frequency];
     const candidates = frequencies
-      .map((frequency) => this.nextRunForFrequency(frequency, from))
-      .filter(Boolean) as string[];
+      .map((frequency) => {
+        const time = this.nextRunForFrequency(frequency, from);
+        return time ? { time, reason: frequency } : null;
+      })
+      .filter(Boolean) as { time: string; reason: string }[];
 
     const allCandidates = [...intervalCandidates, ...candidates];
     if (allCandidates.length === 0) return null;
-    return allCandidates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0];
+    return allCandidates.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())[0];
   }
 
   private nextRunForFrequency(
@@ -178,14 +185,17 @@ export class JobService {
       nextRunAt: null,
       timezone: schedule.timezone || 'UTC',
     };
+    const nextRun = this.nextRunFrom(base, from);
     return {
       ...base,
-      nextRunAt: this.nextRunFrom(base, from),
+      nextRunAt: nextRun?.time || null,
+      nextRunReason: nextRun?.reason || null,
     };
   }
 
   private scheduleSlug(schedule: JobEntity['schedule']): string {
     if (!schedule) return 'manual';
+    if (schedule.nextRunReason) return schedule.nextRunReason;
     const intervalSlugs = (schedule.intervalsHours?.length ? schedule.intervalsHours : schedule.intervalHours ? [schedule.intervalHours] : [])
       .map((interval) => `every-${interval}-hours`);
     const frequencySlugs = (schedule.frequencies?.length ? schedule.frequencies : [schedule.frequency])
@@ -198,10 +208,10 @@ export class JobService {
     const jobs = this.store.getAll<JobEntity>('jobs');
     for (const job of jobs) {
       if (!job.schedule || job.schedule.nextRunAt || job.status === 'running' || job.status === 'cancelled') continue;
-      const nextRunAt = this.nextRunFrom(job.schedule, new Date(job.completedAt || job.createdAt));
-      if (nextRunAt) {
+      const nextRun = this.nextRunFrom(job.schedule, new Date(job.completedAt || job.createdAt));
+      if (nextRun) {
         this.store.update<JobEntity>('jobs', job.id, {
-          schedule: { ...job.schedule, nextRunAt },
+          schedule: { ...job.schedule, nextRunAt: nextRun.time, nextRunReason: nextRun.reason },
           updatedAt: new Date().toISOString(),
         });
       }
@@ -251,7 +261,7 @@ export class JobService {
     const job = this.store.create('jobs', entity);
 
     if (dto.schedule?.frequency === 'once' || !dto.schedule) {
-      this.executeJob(job.id);
+      await this.jobQueue.add('execute', { jobId: job.id });
     }
 
     return job;
@@ -325,7 +335,7 @@ export class JobService {
       completedAt: null,
       updatedAt: new Date().toISOString(),
     });
-    this.executeJob(id);
+    await this.jobQueue.add('execute', { jobId: id });
     return this.findOne(id);
   }
 
@@ -342,7 +352,7 @@ export class JobService {
       completedAt: null,
       updatedAt: new Date().toISOString(),
     });
-    this.executeJob(id);
+    await this.jobQueue.add('execute', { jobId: id });
     return this.findOne(id);
   }
 
@@ -391,7 +401,10 @@ export class JobService {
         currentStep: 'Completed',
         completedAt: completedAt.toISOString(),
         ...(latestJob?.schedule
-          ? { schedule: { ...latestJob.schedule, nextRunAt: this.nextRunFrom(latestJob.schedule, completedAt) } }
+          ? (() => {
+              const nextRun = this.nextRunFrom(latestJob.schedule, completedAt);
+              return { schedule: { ...latestJob.schedule, nextRunAt: nextRun?.time || null, nextRunReason: nextRun?.reason || null } };
+            })()
           : {}),
         updatedAt: completedAt.toISOString(),
       });
@@ -414,7 +427,10 @@ export class JobService {
         completedAt: failedAt.toISOString(),
         failedRunCount: (latestJob?.failedRunCount || 0) + 1,
         ...(latestJob?.schedule
-          ? { schedule: { ...latestJob.schedule, nextRunAt: this.nextRunFrom(latestJob.schedule, failedAt) } }
+          ? (() => {
+              const nextRun = this.nextRunFrom(latestJob.schedule, failedAt);
+              return { schedule: { ...latestJob.schedule, nextRunAt: nextRun?.time || null, nextRunReason: nextRun?.reason || null } };
+            })()
           : {}),
         updatedAt: failedAt.toISOString(),
       });
@@ -558,7 +574,7 @@ export class JobService {
         new Date(j.schedule.nextRunAt).getTime() <= now,
     );
     for (const job of pendingJobs) {
-      this.executeJob(job.id);
+      await this.jobQueue.add('execute', { jobId: job.id });
     }
   }
 }
