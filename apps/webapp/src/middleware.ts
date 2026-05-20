@@ -34,7 +34,7 @@ function unauthorizedJson() {
   );
 }
 
-export async function proxy(request: NextRequest) {
+export default async function middleware(request: NextRequest) {
   if (!authConfigured()) return NextResponse.next();
 
   const { pathname } = request.nextUrl;
