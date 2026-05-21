@@ -13,9 +13,13 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    volumes:
+      - ./data:/data
     environment:
       - PORT=3000
       - NODE_ENV=production
+      - DATABASE_MODE=${DATABASE_MODE:-turso}
+      - SQLITE_PATH=/data/database-bak.sqlite
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - TURSO_DB_URL=${TURSO_DB_URL}

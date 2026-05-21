@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Database Bak',
-  description: 'Database backup, restore, and migration management',
+  description: 'Stateful workspace for human and agent collaboration',
 };
 
 export default function RootLayout({

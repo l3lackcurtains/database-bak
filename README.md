@@ -1,56 +1,63 @@
 # Database Bak
 
-> **Database Backup & Sync Dashboard** — manage backups, snapshots, and sync schedules across PostgreSQL, MongoDB, and SQLite databases.
+Database Bak is an open-source stateful workspace for human + agent collaboration. It keeps important app data, task state, snapshots, and operational context durable across sessions so agents and people can pick up exactly where they left off.
 
-## Features
+## What It Does
 
-- **Multi-database support** — PostgreSQL, MongoDB, SQLite
-- **Scheduled backups** — cron-based job scheduling with BullMQ
-- **Snapshot management** — create, download, and restore snapshots
-- **Storage providers** — S3-compatible storage for backups
-- **Encryption at rest** — database credentials encrypted with AES-256
-- **Job monitoring** — real-time queue monitoring dashboard
-- **Dashboard analytics** — backup stats, storage usage, job history
+- Persist shared workspace state for humans and agents
+- Keep databases, jobs, snapshots, and storage config durable
+- Create and restore database snapshots
+- Schedule backups with cron-based jobs
+- Verify snapshot integrity before restore
+- Run with Turso/libSQL or local SQLite
 
-## Tech Stack
+## Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 16, React 19, Tailwind CSS v4, shadcn/ui, Zustand |
-| Backend | NestJS 11, TypeORM, BullMQ |
-| Database | Turso (libSQL) for config, PostgreSQL/MongoDB for backups |
-| Queue | Redis + BullMQ |
-| Container | Docker Compose, GHCR |
-| CI/CD | GitHub Actions |
+- Frontend: Next.js 16, React 19, Tailwind CSS v4, shadcn/ui
+- Backend: NestJS 11, BullMQ
+- Storage: Turso/libSQL or local SQLite for app data
+- Queue: Redis
+- Delivery: Docker Compose, GHCR, GitHub Actions
+
+## Why It Exists
+
+Most agent workflows lose context between runs. Database Bak keeps the workspace state durable so a human can return later, an agent can resume safely, and the application data behind that collaboration stays consistent.
 
 ## Quick Start
 
-### Prerequisites
-
-- [Bun](https://bun.sh) v1.3+
-- [Docker](https://docker.com) + [Docker Compose](https://docs.docker.com/compose/)
-
-### Local Development
+### Development
 
 ```bash
-# Install dependencies
 bun install
-
-# Start Redis (required for job queue)
 docker compose up -d redis
-
-# Start API (port 3000) and UI (port 7100)
 bun run dev
 ```
 
-Set up environment variables (see `.env`):
-```
+### Environment
+
+Turso/libSQL:
+```env
+DATABASE_MODE=turso
 TURSO_DB_URL=libsql://...
 TURSO_AUTH_TOKEN=...
 ENCRYPTION_KEY=...
 ```
 
-### Docker Compose
+Local SQLite:
+```env
+DATABASE_MODE=sqlite
+SQLITE_PATH=./data/database-bak.sqlite
+ENCRYPTION_KEY=...
+```
+
+Optional auth:
+```env
+DASHBOARD_USERNAME=admin
+DASHBOARD_PASSWORD=changeme
+AUTH_SECRET=some-long-secret
+```
+
+### Docker
 
 ```bash
 docker compose up -d --build
@@ -58,40 +65,25 @@ docker compose up -d --build
 
 ## Deployment
 
-### Dokploy
-
-1. Set your environment variables in the Dokploy dashboard:
-   - `TURSO_DB_URL`, `TURSO_AUTH_TOKEN`, `ENCRYPTION_KEY`
-   - `DASHBOARD_USERNAME`, `DASHBOARD_PASSWORD` (optional auth)
-   - `AUTH_SECRET` (optional session secret)
-
-2. Pre-built images are published to GHCR:
-   - `ghcr.io/l3lackcurtains/database-bak/server:latest`
-   - `ghcr.io/l3lackcurtains/database-bak/ui:latest`
-
-3. Update CORS origins in `apps/api/src/main.ts` to include your domain.
-
-### GitHub Container Registry
-
-Images are automatically built and pushed on every push to `main`:
+The project publishes images to GHCR on `main`:
 - `ghcr.io/l3lackcurtains/database-bak/server`
 - `ghcr.io/l3lackcurtains/database-bak/ui`
 
-## Architecture
+For Dokploy or other container hosts, set the env vars above and point CORS to your UI origin in `apps/api/src/main.ts`.
 
-```
-┌─────────────┐     ┌─────────────┐     ┌────────┐
-│  Next.js 16 │────▶│  NestJS 11  │────▶│ Redis  │
-│  (ui)       │     │  (server)   │     │ (bull) │
-│  :7100      │     │  :3000      │     │        │
-└─────────────┘     └──────┬──────┘     └────────┘
-                           │
-                    ┌──────┴──────┐
-                    │    Turso    │
-                    │   (libSQL)  │
-                    │  (config)   │
-                    └─────────────┘
-```
+## Repository Topics
+
+Suggested GitHub topics:
+- `database-backup`
+- `database-restore`
+- `postgresql`
+- `mongodb`
+- `sqlite`
+- `nestjs`
+- `nextjs`
+- `bullmq`
+- `docker`
+- `ghcr`
 
 ## License
 

@@ -104,7 +104,7 @@ export function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Monitor your database backups and sync operations
+            Keep shared state durable across human and agent work
           </p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">

@@ -41,14 +41,14 @@ export default function LoginPage() {
                 <Database className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-lg font-semibold">Crumet Sync</p>
-                <p className="text-sm text-primary-foreground/70">Backup control panel</p>
+                <p className="text-lg font-semibold">Database Bak</p>
+                <p className="text-sm text-primary-foreground/70">Stateful collaboration layer</p>
               </div>
             </div>
             <div className="space-y-4">
-              <p className="text-4xl font-bold tracking-tight">Secure access for database operations.</p>
+              <p className="text-4xl font-bold tracking-tight">Durable state for human + agent workflows.</p>
               <p className="max-w-md text-sm leading-6 text-primary-foreground/75">
-                Sign in to manage backup jobs, storage targets, snapshots, and restore workflows.
+                Sign in to manage workspace state, snapshots, restore points, and long-running automation safely.
               </p>
             </div>
           </section>
