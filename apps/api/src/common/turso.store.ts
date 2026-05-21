@@ -1,9 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { mkdirSync } from 'fs';
-import { dirname } from 'path';
 import { connect } from '@tursodatabase/serverless';
 import * as bcrypt from 'bcryptjs';
-import * as sqlite3 from 'sqlite3';
 import { setAuthConfiguredViaDb } from './auth-config';
 
 const SCHEMAS = [
@@ -108,44 +105,6 @@ interface DbClient {
   close(): void;
 }
 
-class SqliteClient implements DbClient {
-  private db: sqlite3.Database;
-
-  constructor(filePath: string) {
-    mkdirSync(dirname(filePath), { recursive: true });
-    this.db = new sqlite3.Database(filePath);
-  }
-
-  execute(sql: string, params: any[] = []): Promise<QueryResult> {
-    const statement = sql.trim().toLowerCase();
-    const isSelect = statement.startsWith('select') || statement.startsWith('pragma');
-
-    if (isSelect) {
-      return new Promise((resolve, reject) => {
-        this.db.all(sql, params, (err, rows: any[]) => {
-          if (err) return reject(err);
-          resolve({
-            rows: rows.map((row) => Object.values(row)),
-            columns: rows.length > 0 ? Object.keys(rows[0]) : [],
-            rowsAffected: 0,
-          });
-        });
-      });
-    }
-
-    return new Promise((resolve, reject) => {
-      this.db.run(sql, params, function (err) {
-        if (err) return reject(err);
-        resolve({ rows: [], columns: [], rowsAffected: this.changes ?? 0 });
-      });
-    });
-  }
-
-  close() {
-    this.db.close();
-  }
-}
-
 class TursoClient implements DbClient {
   constructor(private client: ReturnType<typeof connect>) {}
 
@@ -167,14 +126,6 @@ export class TursoStore implements OnModuleInit, OnModuleDestroy {
   private client!: DbClient;
 
   constructor() {
-    const mode = process.env.DATABASE_MODE || 'turso';
-
-    if (mode === 'sqlite') {
-      const path = process.env.SQLITE_PATH || './data/database-bak.sqlite';
-      this.client = new SqliteClient(path);
-      return;
-    }
-
     const url = process.env.TURSO_DB_URL || '';
     const authToken = process.env.TURSO_AUTH_TOKEN || '';
 
