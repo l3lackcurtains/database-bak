@@ -3,14 +3,14 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Database as DatabaseIcon, HardDrive, CalendarClock, FileArchive, Download, Trash2, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Database as DatabaseIcon, HardDrive, CalendarClock, FileArchive, Download, Trash2, RotateCcw, ShieldCheck, ShieldX } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { snapshotsApi, databasesApi, storageApi } from '@/lib/api-routes';
 import { formatDate, formatBytes } from '@/lib/utils';
-import type { Snapshot, Database, StorageConfig } from '@/types';
+import type { Snapshot, Database, StorageConfig, SnapshotVerifyResult } from '@/types';
 
 function statusBadge(status: string) {
   const variants: Record<string, 'success' | 'destructive' | 'warning' | 'secondary'> = {
@@ -40,6 +40,8 @@ export function SnapshotDetailsPage({ params }: { params: Promise<{ id: string }
   const [storage, setStorage] = useState<StorageConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<SnapshotVerifyResult | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -67,6 +69,19 @@ export function SnapshotDetailsPage({ params }: { params: Promise<{ id: string }
       window.open(res.url, '_blank');
     } catch (err: any) {
       alert(err.message || 'Failed to generate download URL');
+    }
+  };
+
+  const handleVerify = async () => {
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      const result = await snapshotsApi.verify(id);
+      setVerifyResult(result);
+    } catch (err: any) {
+      alert(err.message || 'Verification failed');
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -110,6 +125,10 @@ export function SnapshotDetailsPage({ params }: { params: Promise<{ id: string }
           </Button>
           {snapshot.status === 'completed' && (
             <>
+              <Button variant="outline" onClick={handleVerify} disabled={verifying}>
+                {verifying ? <Spinner className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                {verifying ? 'Verifying...' : 'Verify'}
+              </Button>
               <Button variant="outline" onClick={handleDownload}>
                 <Download className="h-4 w-4" /> Download
               </Button>
@@ -265,6 +284,34 @@ export function SnapshotDetailsPage({ params }: { params: Promise<{ id: string }
               <DetailRow label="Compressed" value={formatBytes(snapshot.compressedSize)} />
             </CardContent>
           </Card>
+
+          {verifyResult && (
+            <Card className={verifyResult.valid ? 'border-green-500/50' : 'border-red-500/50'}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  {verifyResult.valid ? (
+                    <ShieldCheck className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <ShieldX className="h-4 w-4 text-red-500" />
+                  )}
+                  Integrity Check
+                  {verifyResult.valid
+                    ? <Badge variant="success">Passed</Badge>
+                    : <Badge variant="destructive">Failed</Badge>
+                  }
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <DetailRow label="Checksum Match" value={verifyResult.checksum.match ? 'Yes' : 'No'} />
+                <DetailRow label="Format Valid" value={verifyResult.format.valid ? 'Yes' : 'No'} />
+                {verifyResult.format.detected && (
+                  <DetailRow label="Format" value={verifyResult.format.detected} />
+                )}
+                <DetailRow label="Verified Size" value={formatBytes(verifyResult.size)} />
+                <DetailRow label="Verified At" value={new Date(verifyResult.verifiedAt).toLocaleString()} />
+              </CardContent>
+            </Card>
+          )}
 
           {snapshot.metadata && (
             <Card>

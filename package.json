@@ -1,5 +1,5 @@
 {
-  "name": "crumet-sync",
+  "name": "database-bak",
   "private": true,
   "scripts": {
     "build": "turbo build",

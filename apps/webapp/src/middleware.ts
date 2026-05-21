@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const SESSION_COOKIE = 'crumet_session';
+const SESSION_COOKIE = 'dbak_session';
 
 function authConfigured() {
   return Boolean(process.env.DASHBOARD_USERNAME && process.env.DASHBOARD_PASSWORD);

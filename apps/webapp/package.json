@@ -1,5 +1,5 @@
 {
-  "name": "crumet-sync-web",
+  "name": "@database-bak/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {

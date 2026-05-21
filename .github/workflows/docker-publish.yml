@@ -25,22 +25,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push API
+      - name: Build and push Server
         uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/api/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/api:latest
-            ${{ env.REGISTRY }}/${{ github.repository }}/api:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ github.repository }}/server:latest
+            ${{ env.REGISTRY }}/${{ github.repository }}/server:${{ github.sha }}
 
-      - name: Build and push Webapp
+      - name: Build and push UI
         uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/webapp/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/webapp:latest
-            ${{ env.REGISTRY }}/${{ github.repository }}/webapp:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ github.repository }}/ui:latest
+            ${{ env.REGISTRY }}/${{ github.repository }}/ui:${{ github.sha }}

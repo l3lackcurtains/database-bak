@@ -3,6 +3,7 @@ import type {
   Database,
   StorageConfig,
   Snapshot,
+  SnapshotVerifyResult,
   BackupJob,
   DashboardStats,
   PaginatedResponse,
@@ -49,6 +50,8 @@ export const snapshotsApi = {
     api.post<BackupJob>(`/snapshots/${id}/restore`, { targetDatabaseId, cleanTarget }),
   downloadUrl: (id: string) =>
     api.get<{ url: string; expiresAt: string }>(`/snapshots/${id}/download`),
+  verify: (id: string) =>
+    api.post<SnapshotVerifyResult>(`/snapshots/${id}/verify`),
 };
 
 export const jobsApi = {

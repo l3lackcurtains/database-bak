@@ -8,7 +8,7 @@ RUN bun install --frozen-lockfile --workspaces
 
 COPY turbo.json ./
 COPY apps/webapp apps/webapp
-RUN bun run --filter=crumet-sync-web build
+RUN bun run --filter=@database-bak/web build
 
 FROM node:22-alpine
 WORKDIR /app

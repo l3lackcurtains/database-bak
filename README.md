@@ -39,7 +39,7 @@ bun install
 # Start Redis (required for job queue)
 docker compose up -d redis
 
-# Start API (port 3000) and Webapp (port 7100)
+# Start API (port 3000) and UI (port 7100)
 bun run dev
 ```
 
@@ -66,23 +66,23 @@ docker compose up -d --build
    - `AUTH_SECRET` (optional session secret)
 
 2. Pre-built images are published to GHCR:
-   - `ghcr.io/l3lackcurtains/database-bak/api:latest`
-   - `ghcr.io/l3lackcurtains/database-bak/webapp:latest`
+   - `ghcr.io/l3lackcurtains/database-bak/server:latest`
+   - `ghcr.io/l3lackcurtains/database-bak/ui:latest`
 
 3. Update CORS origins in `apps/api/src/main.ts` to include your domain.
 
 ### GitHub Container Registry
 
 Images are automatically built and pushed on every push to `main`:
-- `ghcr.io/l3lackcurtains/database-bak/api`
-- `ghcr.io/l3lackcurtains/database-bak/webapp`
+- `ghcr.io/l3lackcurtains/database-bak/server`
+- `ghcr.io/l3lackcurtains/database-bak/ui`
 
 ## Architecture
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌────────┐
 │  Next.js 16 │────▶│  NestJS 11  │────▶│ Redis  │
-│  (webapp)   │     │  (api)      │     │ (bull) │
+│  (ui)       │     │  (server)   │     │ (bull) │
 │  :7100      │     │  :3000      │     │        │
 └─────────────┘     └──────┬──────┘     └────────┘
                            │

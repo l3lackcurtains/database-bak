@@ -168,6 +168,15 @@ export interface JobSnapshotDetails {
   };
 }
 
+export interface SnapshotVerifyResult {
+  valid: boolean;
+  checksum: { computed: string; stored: string; match: boolean };
+  format: { valid: boolean; detected?: string };
+  size: number;
+  snapshotId: string;
+  verifiedAt: string;
+}
+
 export interface DashboardStats {
   totalDatabases: number;
   totalSnapshots: number;

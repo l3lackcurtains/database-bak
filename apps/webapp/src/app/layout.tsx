@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Crumet Sync',
-  description: 'Database backup, restore, and migration management for Crumet Sync',
+  title: 'Database Bak',
+  description: 'Database backup, restore, and migration management',
 };
 
 export default function RootLayout({
@@ -16,7 +16,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){var t=localStorage.getItem('crumet-theme');if(t==='dark'||t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches||!t&&matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.classList.add('dark')})()`,
+            __html: `(function(){var t=localStorage.getItem('dbak-theme');if(t==='dark'||t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches||!t&&matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.classList.add('dark')})()`,
           }}
         />
       </head>

@@ -5,8 +5,8 @@ services:
     volumes:
       - redis-data:/data
 
-  api:
-    image: ghcr.io/l3lackcurtains/database-bak/api:latest
+  server:
+    image: ghcr.io/l3lackcurtains/database-bak/server:latest
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -27,8 +27,8 @@ services:
     depends_on:
       - redis
 
-  webapp:
-    image: ghcr.io/l3lackcurtains/database-bak/webapp:latest
+  ui:
+    image: ghcr.io/l3lackcurtains/database-bak/ui:latest
     build:
       context: .
       dockerfile: apps/webapp/Dockerfile
@@ -37,12 +37,12 @@ services:
       - "7100:7100"
     environment:
       - PORT=7100
-      - API_URL=http://api:3000
+      - API_URL=http://server:3000
       - DASHBOARD_USERNAME=${DASHBOARD_USERNAME:-admin}
       - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-changeme}
       - AUTH_SECRET=${AUTH_SECRET}
     depends_on:
-      - api
+      - server
 
 volumes:
   redis-data:

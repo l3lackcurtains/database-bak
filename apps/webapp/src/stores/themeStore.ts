@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-const STORAGE_KEY = 'crumet-theme';
+const STORAGE_KEY = 'dbak-theme';
 
 function getInitialTheme(): 'light' | 'dark' | 'system' {
   try {

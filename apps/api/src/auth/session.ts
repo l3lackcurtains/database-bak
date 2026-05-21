@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 
 import { isAuthConfiguredViaDb, setAuthConfiguredViaDb } from '../common/auth-config';
 
-export const SESSION_COOKIE = 'crumet_session';
+export const SESSION_COOKIE = 'dbak_session';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
 
 export type AuthUser = {

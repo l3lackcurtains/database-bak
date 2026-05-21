@@ -1,8 +1,10 @@
+import { createHash } from 'crypto';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { TursoStore } from '../common/turso.store';
+import { HashStream } from '../common/hash-stream';
 import { JobEntity } from '../entities/job.entity';
 import { CreateJobDto, UpdateJobDto } from './job.types';
 import { DatabaseService } from '../database/database.service';
@@ -476,13 +478,18 @@ export class JobService {
       .replace(/^-+|-+$/g, '') || 'database';
     const scheduleSlug = this.scheduleSlug(job?.schedule || null);
     const key = `${db.type}/${safeDatabaseName}/${safeDatabaseName}-${scheduleSlug}-${timestamp}-${snapshot.id}.dump.gz`;
+
+    const hashStream = new HashStream();
+    dumpResult.stream.pipe(hashStream);
+
     const uploadResult = await this.storageService.uploadFile(
       storage,
       key,
-      dumpResult.stream,
+      hashStream,
     );
 
     const uploadedSize = await this.storageService.getFileSize(storage, uploadResult.key);
+    const checksum = hashStream.digest || '';
 
     await this.store.update<JobEntity>('jobs', jobId, {
       progress: 90,
@@ -493,7 +500,7 @@ export class JobService {
       storageKey: uploadResult.key,
       size: uploadedSize,
       compressedSize: uploadedSize,
-      checksum: 'streamed',
+      checksum,
       status: 'completed',
       completedAt: new Date().toISOString(),
       metadata: {
@@ -520,6 +527,19 @@ export class JobService {
     }
     if (snapshot.status !== 'completed') {
       throw new Error(`Snapshot is not ready to restore: ${snapshot.status}`);
+    }
+
+    await this.store.update<JobEntity>('jobs', jobId, {
+      progress: 20,
+      currentStep: 'Verifying snapshot integrity',
+    });
+    const verifyStream = await this.storageService.downloadFileStream(storage, snapshot.storageKey);
+    const verification = await computeChecksum(verifyStream);
+
+    if (snapshot.checksum && snapshot.checksum !== verification.checksum) {
+      throw new Error(
+        `Snapshot checksum mismatch. Stored: ${snapshot.checksum}, Computed: ${verification.checksum}. The snapshot may be corrupted.`,
+      );
     }
 
     await this.store.update<JobEntity>('jobs', jobId, {
@@ -579,4 +599,16 @@ export class JobService {
       await this.jobQueue.add('execute', { jobId: job.id });
     }
   }
+}
+
+async function computeChecksum(stream: NodeJS.ReadableStream): Promise<{ checksum: string; size: number }> {
+  const hash = createHash('sha256');
+  let size = 0;
+
+  for await (const chunk of stream) {
+    hash.update(chunk);
+    size += chunk.length;
+  }
+
+  return { checksum: hash.digest('hex'), size };
 }

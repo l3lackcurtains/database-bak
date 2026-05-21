@@ -5,12 +5,12 @@ export function BrandLogo({ className }: { className?: string }) {
     <svg
       viewBox="0 0 40 40"
       role="img"
-      aria-label="Crumet Sync logo"
+      aria-label="Database Bak logo"
       className={cn('h-9 w-9 shrink-0', className)}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect width="40" height="40" rx="12" fill="url(#crumet-sync-bg)" />
+      <rect width="40" height="40" rx="12" fill="url(#dbak-bg)" />
       <path
         d="M12 13.5c0-2.21 3.58-4 8-4s8 1.79 8 4-3.58 4-8 4-8-1.79-8-4Z"
         fill="white"
@@ -37,7 +37,7 @@ export function BrandLogo({ className }: { className?: string }) {
         strokeLinejoin="round"
       />
       <defs>
-        <linearGradient id="crumet-sync-bg" x1="5" y1="4" x2="35" y2="36" gradientUnits="userSpaceOnUse">
+        <linearGradient id="dbak-bg" x1="5" y1="4" x2="35" y2="36" gradientUnits="userSpaceOnUse">
           <stop stopColor="#16A34A" />
           <stop offset="1" stopColor="#0F766E" />
         </linearGradient>
