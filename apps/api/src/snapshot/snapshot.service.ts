@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { JsonStore } from '../common/json.store';
+import { TursoStore } from '../common/turso.store';
 import { SnapshotEntity } from '../entities/snapshot.entity';
 import { CreateSnapshotDto } from './snapshot.types';
 
 @Injectable()
 export class SnapshotService {
-  constructor(private store: JsonStore) {}
+  constructor(private store: TursoStore) {}
 
   async findAll(page: number = 1, limit: number = 20, databaseId?: string) {
-    let snapshots = this.store.getAll<SnapshotEntity>('snapshots');
+    let snapshots = await this.store.getAll<SnapshotEntity>('snapshots');
     if (databaseId) {
       snapshots = snapshots.filter((s) => s.databaseId === databaseId);
     }
@@ -20,7 +20,7 @@ export class SnapshotService {
   }
 
   async findOne(id: string): Promise<SnapshotEntity | null> {
-    return this.store.getById<SnapshotEntity>('snapshots', id) || null;
+    return (await this.store.getById<SnapshotEntity>('snapshots', id)) || null;
   }
 
   async create(dto: CreateSnapshotDto): Promise<SnapshotEntity> {
@@ -56,11 +56,11 @@ export class SnapshotService {
   }
 
   async remove(id: string): Promise<void> {
-    this.store.delete('snapshots', id);
+    await this.store.delete('snapshots', id);
   }
 
   async findByDatabaseId(databaseId: string): Promise<SnapshotEntity[]> {
-    return this.store.findBy(
+    return await this.store.findBy(
       'snapshots',
       (s: SnapshotEntity) => s.databaseId === databaseId,
     );

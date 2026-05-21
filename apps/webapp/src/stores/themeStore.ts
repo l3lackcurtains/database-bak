@@ -1,5 +1,20 @@
 import { create } from 'zustand';
 
+const STORAGE_KEY = 'crumet-theme';
+
+function getInitialTheme(): 'light' | 'dark' | 'system' {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+  } catch {}
+  return 'system';
+}
+
+function resolveTheme(theme: 'light' | 'dark' | 'system'): 'light' | 'dark' {
+  if (theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)) return 'dark';
+  return 'light';
+}
+
 interface ThemeState {
   theme: 'light' | 'dark' | 'system';
   resolvedTheme: 'light' | 'dark';
@@ -11,18 +26,10 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   theme: 'system',
   resolvedTheme: 'light',
   setTheme: (theme) => {
-    set({ theme });
-    const root = document.documentElement;
-    if (
-      theme === 'dark' ||
-      (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-    ) {
-      root.classList.add('dark');
-      set({ resolvedTheme: 'dark' });
-    } else {
-      root.classList.remove('dark');
-      set({ resolvedTheme: 'light' });
-    }
+    try { localStorage.setItem(STORAGE_KEY, theme); } catch {}
+    const resolved = resolveTheme(theme);
+    document.documentElement.classList.toggle('dark', resolved === 'dark');
+    set({ theme, resolvedTheme: resolved });
   },
   toggleTheme: () => {
     const { resolvedTheme } = get();

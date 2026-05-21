@@ -1,12 +1,15 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import type { Request, Response } from 'express';
 
+import { isAuthConfiguredViaDb, setAuthConfiguredViaDb } from '../common/auth-config';
+
 export const SESSION_COOKIE = 'crumet_session';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
 
 export type AuthUser = {
+  id: string;
   username: string;
-  role: 'admin';
+  role: string;
 };
 
 type SessionPayload = AuthUser & {
@@ -40,7 +43,7 @@ function parseCookies(cookieHeader?: string) {
 }
 
 export function authConfigured() {
-  return Boolean(process.env.DASHBOARD_USERNAME && process.env.DASHBOARD_PASSWORD);
+  return isAuthConfiguredViaDb() || Boolean(process.env.DASHBOARD_USERNAME && process.env.DASHBOARD_PASSWORD);
 }
 
 export function createSessionToken(user: AuthUser) {
@@ -68,11 +71,11 @@ export function verifySessionToken(token?: string): AuthUser | null {
 
   try {
     const session = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as SessionPayload;
-    if (!session.username || session.role !== 'admin' || session.exp < Math.floor(Date.now() / 1000)) {
+    if (!session.username || !session.id || session.exp < Math.floor(Date.now() / 1000)) {
       return null;
     }
 
-    return { username: session.username, role: session.role };
+    return { id: session.id, username: session.username, role: session.role };
   } catch {
     return null;
   }

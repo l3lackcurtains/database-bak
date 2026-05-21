@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { JsonStore } from '../common/json.store';
+import { TursoStore } from '../common/turso.store';
 import { DatabaseEntity } from '../entities/database.entity';
 import {
   CreateDatabaseDto,
@@ -9,14 +9,14 @@ import {
 
 @Injectable()
 export class DatabaseService {
-  constructor(private store: JsonStore) {}
+  constructor(private store: TursoStore) {}
 
   async findAll(): Promise<DatabaseEntity[]> {
     return this.store.getAll<DatabaseEntity>('databases');
   }
 
   async findOne(id: string): Promise<DatabaseEntity | null> {
-    return this.store.getById<DatabaseEntity>('databases', id) || null;
+    return (await this.store.getById<DatabaseEntity>('databases', id)) || null;
   }
 
   async create(dto: CreateDatabaseDto): Promise<DatabaseEntity> {
@@ -28,6 +28,7 @@ export class DatabaseService {
       data = {
         id: '',
         name: dto.name || parsed.name || 'unnamed',
+        label: dto.label,
         type: dto.type || parsed.type!,
         host: dto.host || parsed.host!,
         port: dto.port || parsed.port!,
@@ -36,8 +37,6 @@ export class DatabaseService {
         password: dto.password || parsed.password,
         url: dto.url,
         ssl: dto.ssl ?? parsed.ssl ?? false,
-        status: 'disconnected',
-        lastCheckedAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -45,6 +44,7 @@ export class DatabaseService {
       data = {
         id: '',
         name: dto.name!,
+        label: dto.label,
         type: dto.type!,
         host: dto.host!,
         port: dto.port!,
@@ -53,8 +53,6 @@ export class DatabaseService {
         password: dto.password,
         url: dto.url,
         ssl: dto.ssl ?? false,
-        status: 'disconnected',
-        lastCheckedAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -76,11 +74,11 @@ export class DatabaseService {
   }
 
   async remove(id: string): Promise<void> {
-    const jobs = this.store.findBy('jobs', (job: { databaseId?: string }) => job.databaseId === id);
+    const jobs = await this.store.findBy('jobs', (job: { databaseId?: string }) => job.databaseId === id);
     if (jobs.length > 0) {
       throw new BadRequestException('Cannot delete database while jobs reference it');
     }
-    this.store.delete('databases', id);
+    await this.store.delete('databases', id);
   }
 
   async testConnection(

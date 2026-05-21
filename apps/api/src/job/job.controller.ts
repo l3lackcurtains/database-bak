@@ -22,8 +22,9 @@ export class JobController {
     @Query('status') status?: string,
     @Query('type') type?: string,
     @Query('source') source?: string,
+    @Query('databaseId') databaseId?: string,
   ) {
-    return this.service.findAll(parseInt(page), parseInt(limit), status, type, source);
+    return this.service.findAll(parseInt(page), parseInt(limit), status, type, source, databaseId);
   }
 
   @Get(':id')

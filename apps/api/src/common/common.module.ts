@@ -1,9 +1,9 @@
 import { Global, Module } from '@nestjs/common';
-import { JsonStore } from './json.store';
+import { TursoStore } from './turso.store';
 
 @Global()
 @Module({
-  providers: [JsonStore],
-  exports: [JsonStore],
+  providers: [TursoStore],
+  exports: [TursoStore],
 })
 export class CommonModule {}

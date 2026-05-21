@@ -1,24 +1,24 @@
 export type DatabaseType = 'postgres' | 'mongodb';
-export type DatabaseStatus = 'connected' | 'disconnected' | 'error';
 
 export interface DatabaseEntity {
   id: string;
   name: string;
+  label?: string;
   type: DatabaseType;
   host: string;
   port: number;
   database: string;
   username: string;
   password?: string;
+  url?: string;
   ssl: boolean;
-  status: DatabaseStatus;
-  lastCheckedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export class CreateDatabaseDto {
   name?: string;
+  label?: string;
   type?: DatabaseType;
   host?: string;
   port?: number;
@@ -31,6 +31,7 @@ export class CreateDatabaseDto {
 
 export class UpdateDatabaseDto {
   name?: string;
+  label?: string;
   type?: DatabaseType;
   host?: string;
   port?: number;

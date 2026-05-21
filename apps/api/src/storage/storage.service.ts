@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { JsonStore } from '../common/json.store';
+import { TursoStore } from '../common/turso.store';
 import {
   S3Client,
   HeadBucketCommand,
@@ -22,28 +22,28 @@ function normalizeEndpoint(endpoint: string): string {
 
 @Injectable()
 export class StorageService {
-  constructor(private store: JsonStore) {}
+  constructor(private store: TursoStore) {}
 
   async findAll(): Promise<StorageEntity[]> {
     return this.store.getAll<StorageEntity>('storage');
   }
 
   async findOne(id: string): Promise<StorageEntity | null> {
-    return this.store.getById<StorageEntity>('storage', id) || null;
+    return (await this.store.getById<StorageEntity>('storage', id)) || null;
   }
 
   async getDefault(): Promise<StorageEntity | null> {
-    return (
-      this.store.findBy('storage', (s: StorageEntity) => s.isDefault)[0] || null
-    );
+    const found = await this.store.findBy('storage', (s: StorageEntity) => s.isDefault);
+    return found[0] || null;
   }
 
   async create(dto: CreateStorageDto): Promise<StorageEntity> {
-    const count = this.store.count('storage');
+    const count = await this.store.count('storage');
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
     const entity: StorageEntity = {
       id,
       name: dto.name,
+      label: dto.label,
       provider: dto.provider,
       endpoint: dto.endpoint,
       region: dto.region || 'us-east-1',
@@ -70,18 +70,18 @@ export class StorageService {
   }
 
   async remove(id: string): Promise<void> {
-    const jobs = this.store.findBy('jobs', (job: { storageId?: string }) => job.storageId === id);
+    const jobs = await this.store.findBy('jobs', (job: { storageId?: string }) => job.storageId === id);
     if (jobs.length > 0) {
       throw new BadRequestException('Cannot delete storage while jobs reference it');
     }
-    this.store.delete('storage', id);
+    await this.store.delete('storage', id);
   }
 
   async setDefault(id: string): Promise<StorageEntity | null> {
-    const all = this.store.getAll<StorageEntity>('storage');
+    const all = await this.store.getAll<StorageEntity>('storage');
     for (const s of all) {
       if (s.isDefault) {
-        this.store.update<StorageEntity>('storage', s.id, {
+        await this.store.update<StorageEntity>('storage', s.id, {
           isDefault: false,
           updatedAt: new Date().toISOString(),
         });

@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { JsonStore } from '../common/json.store';
+import { TursoStore } from '../common/turso.store';
 import { JobEntity } from '../entities/job.entity';
 import { CreateJobDto, UpdateJobDto } from './job.types';
 import { DatabaseService } from '../database/database.service';
@@ -15,7 +15,7 @@ export class JobService {
   private readonly logger = new Logger(JobService.name);
 
   constructor(
-    private store: JsonStore,
+    private store: TursoStore,
     private databaseService: DatabaseService,
     private storageService: StorageService,
     private snapshotService: SnapshotService,
@@ -29,9 +29,10 @@ export class JobService {
     status?: string,
     type?: string,
     source?: string,
+    databaseId?: string,
   ) {
-    this.ensureScheduledJobsHaveNextRun();
-    let jobs = this.store.getAll<JobEntity>('jobs');
+    await this.ensureScheduledJobsHaveNextRun();
+    let jobs = await this.store.getAll<JobEntity>('jobs');
     if (status) jobs = jobs.filter((j) => j.status === status);
     if (type) jobs = jobs.filter((j) => j.type === type);
     if (source === 'manual') {
@@ -39,22 +40,23 @@ export class JobService {
     } else if (source === 'scheduled') {
       jobs = jobs.filter((j) => !!j.schedule);
     }
+    if (databaseId) jobs = jobs.filter((j) => j.databaseId === databaseId);
     const total = jobs.length;
     const totalPages = Math.ceil(total / limit);
     const start = (page - 1) * limit;
-    const data = jobs.slice(start, start + limit).map((job) => this.withDetails(job));
+    const data = await Promise.all(jobs.slice(start, start + limit).map((job) => this.withDetails(job)));
     return { data, total, page, limit, totalPages };
   }
 
   async findOne(id: string): Promise<JobEntity | null> {
-    this.ensureScheduledJobsHaveNextRun();
-    const job = this.store.getById<JobEntity>('jobs', id) || null;
-    return job ? this.withDetails(job) : null;
+    await this.ensureScheduledJobsHaveNextRun();
+    const job = (await this.store.getById<JobEntity>('jobs', id)) || null;
+    return job ? (await this.withDetails(job)) : null;
   }
 
-  private databaseSummary(id?: string | null) {
+  private async databaseSummary(id?: string | null) {
     if (!id) return null;
-    const db = this.store.getById<any>('databases', id);
+    const db = await this.store.getById<any>('databases', id);
     if (!db) return null;
     return {
       id: db.id,
@@ -69,9 +71,9 @@ export class JobService {
     };
   }
 
-  private storageSummary(id?: string | null) {
+  private async storageSummary(id?: string | null) {
     if (!id) return null;
-    const storage = this.store.getById<any>('storage', id);
+    const storage = await this.store.getById<any>('storage', id);
     if (!storage) return null;
     return {
       id: storage.id,
@@ -84,19 +86,19 @@ export class JobService {
     };
   }
 
-  private withDetails(job: JobEntity): JobEntity {
+  private async withDetails(job: JobEntity): Promise<JobEntity> {
     const snapshotId = job.options?.snapshotId || job.snapshotId;
-    const snapshot = snapshotId ? this.store.getById<any>('snapshots', snapshotId) : null;
+    const snapshot = snapshotId ? await this.store.getById<any>('snapshots', snapshotId) : null;
     const sourceDatabase = snapshot
-      ? this.databaseSummary(snapshot.databaseId) || {
+      ? (await this.databaseSummary(snapshot.databaseId)) || {
           id: snapshot.databaseId,
           name: snapshot.databaseName,
           type: snapshot.databaseType,
           database: snapshot.metadata?.database,
         }
-      : this.databaseSummary(job.databaseId);
+      : await this.databaseSummary(job.databaseId);
     const destinationDatabase = job.type === 'restore'
-      ? this.databaseSummary(job.options?.targetDatabaseId || job.databaseId)
+      ? await this.databaseSummary(job.options?.targetDatabaseId || job.databaseId)
       : null;
 
     return {
@@ -104,7 +106,7 @@ export class JobService {
       details: {
         sourceDatabase,
         destinationDatabase,
-        storage: this.storageSummary(job.storageId),
+        storage: await this.storageSummary(job.storageId),
         snapshot: snapshot
           ? {
               id: snapshot.id,
@@ -204,13 +206,13 @@ export class JobService {
     return slug || 'scheduled';
   }
 
-  private ensureScheduledJobsHaveNextRun() {
-    const jobs = this.store.getAll<JobEntity>('jobs');
+  private async ensureScheduledJobsHaveNextRun() {
+    const jobs = await this.store.getAll<JobEntity>('jobs');
     for (const job of jobs) {
       if (!job.schedule || job.schedule.nextRunAt || job.status === 'running' || job.status === 'cancelled') continue;
       const nextRun = this.nextRunFrom(job.schedule, new Date(job.completedAt || job.createdAt));
       if (nextRun) {
-        this.store.update<JobEntity>('jobs', job.id, {
+        await this.store.update<JobEntity>('jobs', job.id, {
           schedule: { ...job.schedule, nextRunAt: nextRun.time, nextRunReason: nextRun.reason },
           updatedAt: new Date().toISOString(),
         });
@@ -258,7 +260,7 @@ export class JobService {
       updatedAt: new Date().toISOString(),
     };
 
-    const job = this.store.create('jobs', entity);
+    const job = await this.store.create('jobs', entity);
 
     if (dto.schedule?.frequency === 'once' || !dto.schedule) {
       await this.jobQueue.add('execute', { jobId: job.id });
@@ -326,7 +328,7 @@ export class JobService {
   async retry(id: string): Promise<JobEntity | null> {
     const job = await this.findOne(id);
     if (!job || job.status !== 'failed') return null;
-    this.store.update<JobEntity>('jobs', id, {
+    await this.store.update<JobEntity>('jobs', id, {
       status: 'pending',
       progress: 0,
       currentStep: 'Retrying',
@@ -343,7 +345,7 @@ export class JobService {
     const job = await this.findOne(id);
     if (!job || job.status === 'running') return null;
 
-    this.store.update<JobEntity>('jobs', id, {
+    await this.store.update<JobEntity>('jobs', id, {
       status: 'pending',
       progress: 0,
       currentStep: 'Queued',
@@ -357,14 +359,14 @@ export class JobService {
   }
 
   async remove(id: string): Promise<void> {
-    this.store.delete('jobs', id);
+    await this.store.delete('jobs', id);
   }
 
   async executeJob(jobId: string): Promise<void> {
     const job = await this.findOne(jobId);
     if (!job) return;
 
-    this.store.update<JobEntity>('jobs', jobId, {
+    await this.store.update<JobEntity>('jobs', jobId, {
       status: 'running',
       startedAt: new Date().toISOString(),
       currentStep: 'Starting',
@@ -395,7 +397,7 @@ export class JobService {
 
       const completedAt = new Date();
       const latestJob = await this.findOne(jobId);
-      this.store.update<JobEntity>('jobs', jobId, {
+      await this.store.update<JobEntity>('jobs', jobId, {
         status: 'success',
         progress: 100,
         currentStep: 'Completed',
@@ -420,7 +422,7 @@ export class JobService {
       }
       const failedAt = new Date();
       const latestJob = await this.findOne(jobId);
-      this.store.update<JobEntity>('jobs', jobId, {
+      await this.store.update<JobEntity>('jobs', jobId, {
         status: 'failed',
         error: error.message,
         currentStep: 'Failed',
@@ -439,7 +441,7 @@ export class JobService {
 
   private async runBackup(jobId: string, db: any, storage: any): Promise<void> {
     const job = await this.findOne(jobId);
-    this.store.update<JobEntity>('jobs', jobId, {
+    await this.store.update<JobEntity>('jobs', jobId, {
       progress: 10,
       currentStep: 'Creating snapshot record',
     });
@@ -454,7 +456,7 @@ export class JobService {
       sourceJobName: job?.name,
     });
 
-    this.store.update<JobEntity>('jobs', jobId, {
+    await this.store.update<JobEntity>('jobs', jobId, {
       snapshotId: snapshot.id,
       progress: 20,
       currentStep: 'Dumping database',
@@ -462,7 +464,7 @@ export class JobService {
 
     const dumpResult = await this.backupEngine.dumpDatabase(db);
 
-    this.store.update<JobEntity>('jobs', jobId, {
+    await this.store.update<JobEntity>('jobs', jobId, {
       progress: 60,
       currentStep: 'Uploading to storage',
     });
@@ -482,7 +484,7 @@ export class JobService {
 
     const uploadedSize = await this.storageService.getFileSize(storage, uploadResult.key);
 
-    this.store.update<JobEntity>('jobs', jobId, {
+    await this.store.update<JobEntity>('jobs', jobId, {
       progress: 90,
       currentStep: 'Finalizing',
     });
@@ -520,13 +522,13 @@ export class JobService {
       throw new Error(`Snapshot is not ready to restore: ${snapshot.status}`);
     }
 
-    this.store.update<JobEntity>('jobs', jobId, {
+    await this.store.update<JobEntity>('jobs', jobId, {
       progress: 30,
       currentStep: 'Fetching snapshot from storage',
     });
     const archiveStream = await this.storageService.downloadFileStream(storage, snapshot.storageKey);
 
-    this.store.update<JobEntity>('jobs', jobId, {
+    await this.store.update<JobEntity>('jobs', jobId, {
       progress: 70,
       currentStep: 'Restoring database',
     });
@@ -534,7 +536,7 @@ export class JobService {
       cleanBeforeRestore: job.options?.cleanBeforeRestore,
     });
 
-    this.store.update<JobEntity>('jobs', jobId, {
+    await this.store.update<JobEntity>('jobs', jobId, {
       progress: 95,
       currentStep: 'Verifying restore',
     });
@@ -545,17 +547,17 @@ export class JobService {
     db: any,
     storage: any,
   ): Promise<void> {
-    this.store.update<JobEntity>('jobs', jobId, {
+    await this.store.update<JobEntity>('jobs', jobId, {
       progress: 10,
       currentStep: 'Creating backup of source',
     });
     await this.runBackup(jobId, db, storage);
-    this.store.update<JobEntity>('jobs', jobId, {
+    await this.store.update<JobEntity>('jobs', jobId, {
       progress: 50,
       currentStep: 'Restoring to target',
     });
     await new Promise((r) => setTimeout(r, 2000));
-    this.store.update<JobEntity>('jobs', jobId, {
+    await this.store.update<JobEntity>('jobs', jobId, {
       progress: 90,
       currentStep: 'Verifying migration',
     });
@@ -563,9 +565,9 @@ export class JobService {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async checkScheduledJobs() {
-    this.ensureScheduledJobsHaveNextRun();
+    await this.ensureScheduledJobsHaveNextRun();
     const now = Date.now();
-    const pendingJobs = this.store.findBy(
+    const pendingJobs = await this.store.findBy(
       'jobs',
       (j: JobEntity) =>
         !!j.schedule?.nextRunAt &&

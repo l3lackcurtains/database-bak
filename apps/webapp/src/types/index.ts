@@ -11,6 +11,7 @@ export type ScheduleFrequency = 'once' | 'hourly' | 'daily' | 'weekly' | 'monthl
 export interface Database {
   id: string;
   name: string;
+  label?: string;
   type: DatabaseType;
   host: string;
   port: number;
@@ -28,6 +29,7 @@ export interface Database {
 export interface StorageConfig {
   id: string;
   name: string;
+  label?: string;
   provider: StorageProvider;
   endpoint: string;
   region: string;
@@ -63,6 +65,10 @@ export interface Snapshot {
     collections?: string[];
     tables?: string[];
     recordCount?: number;
+    database?: string;
+    archive?: boolean;
+    gzip?: boolean;
+    [key: string]: unknown;
   };
   createdAt: string;
 }

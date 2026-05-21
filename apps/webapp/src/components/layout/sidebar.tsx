@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useSidebarStore } from '@/stores/sidebarStore';
+import { useThemeStore } from '@/stores/themeStore';
 import { BrandLogo } from '@/components/brand/logo';
 import {
   LayoutDashboard,
@@ -12,9 +14,14 @@ import {
   ChevronRight,
   Archive,
   HardDrive,
+  LogOut,
+  Sun,
+  Moon,
+  User,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { authApi } from '@/lib/api-routes';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
@@ -27,7 +34,20 @@ const navItems = [
 
 export function Sidebar() {
   const { collapsed, toggle } = useSidebarStore();
+  const { resolvedTheme, toggleTheme } = useThemeStore();
   const pathname = usePathname();
+  const [user, setUser] = useState<{ username: string; role: string } | null>(null);
+
+  useEffect(() => {
+    authApi.me()
+      .then((res) => setUser(res.user))
+      .catch(() => setUser(null));
+  }, []);
+
+  const handleLogout = async () => {
+    await authApi.logout().catch(() => undefined);
+    window.location.href = '/login';
+  };
 
   return (
     <aside
@@ -77,6 +97,42 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      <div className={cn('border-t border-sidebar-border p-3', collapsed && 'flex flex-col items-center gap-2')}>
+        {!collapsed && (
+          <div className="mb-3 flex items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-foreground/70">
+            <User className="h-4 w-4 shrink-0" />
+            <div className="min-w-0 flex-1 truncate">
+              <div className="font-medium text-sidebar-foreground truncate">{user?.username || 'Guest'}</div>
+              {user?.role && <div className="text-xs text-sidebar-foreground/50 capitalize">{user.role}</div>}
+            </div>
+          </div>
+        )}
+        <div className={cn('flex gap-1', collapsed ? 'flex-col items-center' : 'justify-start')}>
+          <button
+            onClick={toggleTheme}
+            className={cn(
+              'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+              collapsed && 'justify-center px-2',
+            )}
+            title="Toggle theme"
+          >
+            {resolvedTheme === 'dark' ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
+            {!collapsed && <span>{resolvedTheme === 'dark' ? 'Light' : 'Dark'}</span>}
+          </button>
+          <button
+            onClick={handleLogout}
+            className={cn(
+              'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+              collapsed && 'justify-center px-2',
+            )}
+            title="Sign out"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            {!collapsed && <span>Sign out</span>}
+          </button>
+        </div>
+      </div>
     </aside>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { formatDate } from '@/lib/utils';
 import { Plus, Trash2, RefreshCw, Star, Edit3 } from 'lucide-react';
 
 export function StoragePage() {
+  const router = useRouter();
   const [storageConfigs, setStorageConfigs] = useState<StorageConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -112,7 +114,7 @@ export function StoragePage() {
                   <TableRow key={s.id}>
                     <TableCell>
                       <div className="space-y-1">
-                        <div className="max-w-[220px] truncate font-medium">{s.name}</div>
+                        <button className="max-w-[220px] truncate font-medium text-left hover:underline cursor-pointer" onClick={() => router.push(`/storage/${s.id}`)}>{s.label || s.name}</button>
                         <Badge variant="secondary">{providerLabel(s.provider)}</Badge>
                       </div>
                     </TableCell>
@@ -137,27 +139,12 @@ export function StoragePage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleTest({
-                            provider: s.provider,
-                            endpoint: s.endpoint,
-                            region: s.region,
-                            bucket: s.bucket,
-                            accessKeyId: s.accessKeyId,
-                            secretAccessKey: s.secretAccessKey,
-                            pathPrefix: s.pathPrefix,
-                          })}
-                        >
-                          Test
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
                           onClick={() => {
                             setShowForm(false);
                             setEditingStorage(s);
                           }}
                         >
-                          <Edit3 className="h-4 w-4" /> Edit
+                          <Edit3 className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -187,6 +174,7 @@ function StorageForm({
   const isEditing = Boolean(storage);
   const [form, setForm] = useState({
     name: storage?.name || '',
+    label: storage?.label || '',
     provider: storage?.provider || ('s3' as StorageConfig['provider']),
     endpoint: storage?.endpoint || '',
     region: storage?.region || 'us-east-1',
@@ -239,14 +227,22 @@ function StorageForm({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="text-sm font-medium">Name</label>
-              <input
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Production S3" required
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Provider</label>
+                <input
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Production S3" required
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Label <span className="text-muted-foreground">(optional)</span></label>
+                <input
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })}
+                  placeholder="My Storage"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Provider</label>
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={form.provider}

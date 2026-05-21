@@ -52,13 +52,14 @@ export const snapshotsApi = {
 };
 
 export const jobsApi = {
-  list: (params?: { page?: number; limit?: number; status?: string; type?: string; source?: 'manual' | 'scheduled' }) => {
+  list: (params?: { page?: number; limit?: number; status?: string; type?: string; source?: 'manual' | 'scheduled'; databaseId?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.status) query.set('status', params.status);
     if (params?.type) query.set('type', params.type);
     if (params?.source) query.set('source', params.source);
+    if (params?.databaseId) query.set('databaseId', params.databaseId);
     const qs = query.toString();
     return api.get<PaginatedResponse<BackupJob>>(`/jobs${qs ? `?${qs}` : ''}`);
   },
@@ -109,7 +110,21 @@ export const dashboardApi = {
 
 export const authApi = {
   login: (data: { username: string; password: string }) =>
-    api.post<{ user: { username: string; role: 'admin' } }>('/auth/login', data),
+    api.post<{ user: { id: string; username: string; role: string } }>('/auth/login', data),
   logout: () => api.post<{ success: boolean }>('/auth/logout'),
-  me: () => api.get<{ user: { username: string; role: 'admin' } }>('/auth/me'),
+  me: () => api.get<{ user: { id: string; username: string; role: string } }>('/auth/me'),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    api.post<{ success: boolean }>('/auth/change-password', data),
+};
+
+export type UserInfo = { id: string; username: string; role: string; createdAt: string; updatedAt?: string };
+
+export const usersApi = {
+  list: () => api.get<UserInfo[]>('/users'),
+  get: (id: string) => api.get<UserInfo>(`/users/${id}`),
+  create: (data: { username: string; password: string; role?: string }) =>
+    api.post<UserInfo>('/users', data),
+  update: (id: string, data: { username?: string; password?: string; role?: string }) =>
+    api.patch<UserInfo>(`/users/${id}`, data),
+  delete: (id: string) => api.delete<{ success: boolean }>(`/users/${id}`),
 };

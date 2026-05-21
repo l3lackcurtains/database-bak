@@ -245,7 +245,9 @@ export function SnapshotsPage() {
                           className="h-4 w-4 rounded border-input accent-primary"
                         />
                       </TableCell>
-                      <TableCell className="max-w-[220px] truncate font-medium">{s.databaseName}</TableCell>
+                      <TableCell>
+                        <button className="max-w-[220px] truncate font-medium text-left hover:underline cursor-pointer" onClick={() => router.push(`/snapshots/${s.id}`)}>{s.databaseName}</button>
+                      </TableCell>
                       <TableCell><Badge variant="secondary" className="capitalize">{s.databaseType}</Badge></TableCell>
                       <TableCell>{sourceBadge(s)}</TableCell>
                       <TableCell className="font-mono text-sm">{formatBytes(s.compressedSize)}</TableCell>
@@ -253,19 +255,19 @@ export function SnapshotsPage() {
                       <TableCell className="text-sm text-muted-foreground">{formatDate(s.createdAt)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleDownload(s.id)} title="Download">
+                          <Button variant="ghost" size="sm" onClick={() => handleDownload(s.id)} title="Download">
                             <Download className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
-                            size="icon"
+                            size="sm"
                             disabled={s.status !== 'completed'}
                             onClick={() => router.push(`/snapshots/${s.id}/restore`)}
                             title="Restore"
                           >
                             <RotateCcw className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)} title="Delete">
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)} title="Delete">
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>

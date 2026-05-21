@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import type { Database } from '@/types';
 import { Copy, Plus, Trash2, RefreshCw, Link2, Edit3 } from 'lucide-react';
 
 export function DatabasesPage() {
+  const router = useRouter();
   const [databases, setDatabases] = useState<Database[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -101,11 +103,11 @@ export function DatabasesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {databases.map((db) => (
+                  {databases.map((db) => (
                   <TableRow key={db.id}>
                     <TableCell>
                       <div className="space-y-1">
-                        <div className="max-w-[220px] truncate font-medium">{db.name}</div>
+                        <button className="max-w-[220px] truncate font-medium text-left hover:underline cursor-pointer" onClick={() => router.push(`/databases/${db.id}`)}>{db.label || db.name}</button>
                         <Badge variant="secondary" className="capitalize">{db.type}</Badge>
                       </div>
                     </TableCell>
@@ -120,24 +122,13 @@ export function DatabasesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleTest({
-                            type: db.type, host: db.host, port: db.port,
-                            database: db.database, username: db.username,
-                            password: db.password, url: db.url, ssl: db.ssl,
-                          })}
-                        >
-                          Test
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
                           onClick={() => {
                             setShowForm(false);
                             setCloningDatabase(null);
                             setEditingDatabase(db);
                           }}
                         >
-                          <Edit3 className="h-4 w-4" /> Edit
+                          <Edit3 className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -148,7 +139,7 @@ export function DatabasesPage() {
                             setCloningDatabase(db);
                           }}
                         >
-                          <Copy className="h-4 w-4" /> Clone
+                          <Copy className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleDelete(db.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -185,6 +176,7 @@ export function DatabaseForm({
   const [connectionUrl, setConnectionUrl] = useState(database?.url || '');
   const [form, setForm] = useState({
     name: isCloning && database?.name ? `${database.name} copy` : database?.name || '',
+    label: database?.label || '',
     type: database?.type || defaultType,
     host: database?.host || '',
     port: database?.port || 5432,
@@ -215,6 +207,7 @@ export function DatabaseForm({
 
       return {
         name: dbPath || `${parsed.hostname}-db`,
+        label: '',
         type,
         host: parsed.hostname,
         port,
@@ -340,6 +333,14 @@ export function DatabaseForm({
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="Production DB" required
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Label <span className="text-muted-foreground">(optional)</span></label>
+                <input
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })}
+                  placeholder="My Database"
                 />
               </div>
               <div>

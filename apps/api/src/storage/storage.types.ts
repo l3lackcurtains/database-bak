@@ -10,6 +10,7 @@ export type StorageStatus = 'connected' | 'disconnected' | 'error';
 export interface StorageEntity {
   id: string;
   name: string;
+  label?: string;
   provider: StorageProvider;
   endpoint: string;
   region: string;
@@ -25,6 +26,7 @@ export interface StorageEntity {
 
 export class CreateStorageDto {
   name: string;
+  label?: string;
   provider: StorageProvider;
   endpoint: string;
   region?: string;
@@ -36,6 +38,7 @@ export class CreateStorageDto {
 
 export class UpdateStorageDto {
   name?: string;
+  label?: string;
   provider?: StorageProvider;
   endpoint?: string;
   region?: string;

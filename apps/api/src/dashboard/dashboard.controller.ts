@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { JsonStore } from '../common/json.store';
+import { TursoStore } from '../common/turso.store';
 import { JobEntity } from '../entities/job.entity';
 import { SnapshotEntity } from '../entities/snapshot.entity';
 
@@ -15,12 +15,12 @@ interface DashboardStats {
 
 @Controller('dashboard')
 export class DashboardController {
-  constructor(private store: JsonStore) {}
+  constructor(private store: TursoStore) {}
 
   @Get('stats')
   async getStats(): Promise<DashboardStats> {
-    const jobs = this.store.getAll<JobEntity>('jobs');
-    const snapshots = this.store.getAll<SnapshotEntity>('snapshots');
+    const jobs = await this.store.getAll<JobEntity>('jobs');
+    const snapshots = await this.store.getAll<SnapshotEntity>('snapshots');
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
@@ -51,7 +51,7 @@ export class DashboardController {
     );
 
     return {
-      totalDatabases: this.store.count('databases'),
+      totalDatabases: await this.store.count('databases'),
       totalSnapshots: snapshots.length,
       totalStorageUsed,
       activeJobs,
