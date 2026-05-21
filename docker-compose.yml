@@ -1,0 +1,46 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - TURSO_DB_URL=${TURSO_DB_URL}
+      - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - DASHBOARD_USERNAME=${DASHBOARD_USERNAME:-admin}
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-changeme}
+      - AUTH_SECRET=${AUTH_SECRET}
+    depends_on:
+      - redis
+
+  webapp:
+    build:
+      context: .
+      dockerfile: apps/webapp/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "7100:7100"
+    environment:
+      - PORT=7100
+      - API_URL=http://api:3000
+      - DASHBOARD_USERNAME=${DASHBOARD_USERNAME:-admin}
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-changeme}
+      - AUTH_SECRET=${AUTH_SECRET}
+    depends_on:
+      - api
+
+volumes:
+  redis-data:

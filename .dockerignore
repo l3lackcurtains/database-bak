@@ -1,0 +1,8 @@
+node_modules
+.git
+.gitignore
+.turbo
+.env
+.env.local
+.env.*.local
+*.md
