@@ -599,6 +599,33 @@ export class JobService {
       await this.jobQueue.add('execute', { jobId: job.id });
     }
   }
+
+  @Cron(CronExpression.EVERY_30_MINUTES)
+  async cleanupStuckJobs() {
+    const maxRunningMinutes = 60;
+    const cutoffTime = new Date(Date.now() - maxRunningMinutes * 60 * 1000).toISOString();
+
+    const stuckJobs = await this.store.findBy(
+      'jobs',
+      (j: JobEntity) =>
+        j.status === 'running' &&
+        j.startedAt &&
+        j.startedAt < cutoffTime,
+    );
+
+    if (stuckJobs.length > 0) {
+      this.logger.warn(`[Self-Healing] Found ${stuckJobs.length} stuck job(s) running for more than ${maxRunningMinutes} minutes`);
+      for (const job of stuckJobs) {
+        await this.store.update<JobEntity>('jobs', job.id, {
+          status: 'failed',
+          error: `Job timed out after ${maxRunningMinutes} minutes. System self-healed by marking as failed.`,
+          currentStep: 'Failed - timed out',
+          completedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+  }
 }
 
 async function computeChecksum(stream: NodeJS.ReadableStream): Promise<{ checksum: string; size: number }> {

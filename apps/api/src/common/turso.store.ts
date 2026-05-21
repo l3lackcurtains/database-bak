@@ -3,6 +3,7 @@ import { connect } from '@tursodatabase/serverless';
 import * as bcrypt from 'bcryptjs';
 import { setAuthConfiguredViaDb } from './auth-config';
 
+
 const SCHEMAS = [
   `CREATE TABLE IF NOT EXISTS databases (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL,
@@ -104,6 +105,37 @@ interface DbClient {
   execute(sql: string, params?: any[]): Promise<QueryResult>;
   close(): void;
 }
+
+class TursoClient implements DbClient {
+  constructor(private client: ReturnType<typeof connect>) {}
+
+  execute(sql: string, params: any[] = []): Promise<QueryResult> {
+    return this.client.execute(sql, params).then((result: any) => ({
+      rows: result.rows || [],
+      columns: result.columns || [],
+      rowsAffected: result.rowsAffected || 0,
+    }));
+  }
+
+  close() {
+    this.client.close();
+  }
+}
+
+@Injectable()
+export class TursoStore implements OnModuleInit, OnModuleDestroy {
+  private client!: DbClient;
+
+  constructor() {
+    const url = process.env.TURSO_DB_URL || '';
+    const authToken = process.env.TURSO_AUTH_TOKEN || '';
+
+    if (!url) {
+      throw new Error('TURSO_DB_URL environment variable is required');
+    }
+
+    this.client = new TursoClient(connect({ url, authToken }));
+  }
 
 class TursoClient implements DbClient {
   constructor(private client: ReturnType<typeof connect>) {}

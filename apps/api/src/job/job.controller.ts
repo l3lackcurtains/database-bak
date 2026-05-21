@@ -62,4 +62,10 @@ export class JobController {
     await this.service.remove(id);
     return { success: true };
   }
+
+  @Post('cleanup-stuck')
+  async cleanupStuck() {
+    await this.service.cleanupStuckJobs();
+    return { success: true, message: 'Cleanup completed' };
+  }
 }

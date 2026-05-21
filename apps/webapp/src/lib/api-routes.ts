@@ -97,7 +97,7 @@ export const jobsApi = {
     } | null;
     options?: Record<string, unknown>;
   }) => api.patch<BackupJob>(`/jobs/${id}`, data),
-  cancel: (id: string) => api.patch<BackupJob>(`/jobs/${id}/cancel`),
+  cancel: (id: string) => api.patch<BackupJob>(`/jobs/${id}/cancel`, {}),
   retry: (id: string) => api.post<BackupJob>(`/jobs/${id}/retry`),
   runNow: (id: string) => api.post<BackupJob>(`/jobs/${id}/run`),
   delete: (id: string) => api.delete<void>(`/jobs/${id}`),
