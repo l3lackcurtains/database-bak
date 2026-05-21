@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { databasesApi } from '@/lib/api-routes';
 import { ApiError } from '@/lib/api';
 import type { Database } from '@/types';
-import { Copy, Plus, Trash2, RefreshCw, Link2, Edit3 } from 'lucide-react';
+import { Copy, Plus, Trash2, RefreshCw, Link2, Edit3, Lock } from 'lucide-react';
 
 export function DatabasesPage() {
   const router = useRouter();
@@ -405,14 +405,20 @@ export function DatabaseForm({
             </div>
           )}
 
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-            <Button type="button" variant="secondary" onClick={handleTest} disabled={testing || !form.host}>
-              {testing ? 'Testing...' : 'Test Connection'}
-            </Button>
-            <Button type="submit" disabled={!form.host || !form.database}>
-              {isEditing ? 'Save Changes' : isCloning ? 'Create Clone' : 'Add Connection'}
-            </Button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Lock className="h-3 w-3" />
+              Credentials encrypted at rest
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+              <Button type="button" variant="secondary" onClick={handleTest} disabled={testing || !form.host}>
+                {testing ? 'Testing...' : 'Test Connection'}
+              </Button>
+              <Button type="submit" disabled={!form.host || !form.database}>
+                {isEditing ? 'Save Changes' : isCloning ? 'Create Clone' : 'Add Connection'}
+              </Button>
+            </div>
           </div>
         </form>
       </CardContent>

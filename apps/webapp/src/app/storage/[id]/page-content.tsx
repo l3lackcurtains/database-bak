@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, HardDrive, Database, CalendarClock, Globe, ShieldCheck, Activity, Star, Trash2 } from 'lucide-react';
+import { ArrowLeft, HardDrive, Database, CalendarClock, Globe, ShieldCheck, Activity, Star, Trash2, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -197,6 +197,10 @@ export function StorageDetailsPage({ params }: { params: Promise<{ id: string }>
               <DetailRow label="Default" value={storage.isDefault ? 'Yes' : 'No'} />
               <DetailRow label="Created" value={formatDate(storage.createdAt)} />
               <DetailRow label="Updated" value={formatDate(storage.updatedAt)} />
+              <div className="flex items-center gap-1.5 pt-2 text-xs text-muted-foreground">
+                <Lock className="h-3 w-3" />
+                Credentials encrypted at rest
+              </div>
             </CardContent>
           </Card>
 

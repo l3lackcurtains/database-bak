@@ -11,7 +11,7 @@ import { storageApi } from '@/lib/api-routes';
 import { ApiError } from '@/lib/api';
 import type { StorageConfig } from '@/types';
 import { formatDate } from '@/lib/utils';
-import { Plus, Trash2, RefreshCw, Star, Edit3 } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Star, Edit3, Lock } from 'lucide-react';
 
 export function StoragePage() {
   const router = useRouter();
@@ -311,17 +311,23 @@ function StorageForm({
               {testResult.message}
             </div>
           )}
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleTest}
-              disabled={testing || !form.endpoint || !form.bucket || !form.accessKeyId || !form.secretAccessKey}
-            >
-              {testing ? 'Testing...' : 'Test Connection'}
-            </Button>
-            <Button type="submit">{isEditing ? 'Save Changes' : 'Add Storage'}</Button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Lock className="h-3 w-3" />
+              Credentials encrypted at rest
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleTest}
+                disabled={testing || !form.endpoint || !form.bucket || !form.accessKeyId || !form.secretAccessKey}
+              >
+                {testing ? 'Testing...' : 'Test Connection'}
+              </Button>
+              <Button type="submit">{isEditing ? 'Save Changes' : 'Add Storage'}</Button>
+            </div>
           </div>
         </form>
       </CardContent>
