@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TursoStore } from '../common/turso.store';
+import { CryptoService } from '../common/crypto.service';
 import {
   S3Client,
   HeadBucketCommand,
@@ -22,14 +23,35 @@ function normalizeEndpoint(endpoint: string): string {
 
 @Injectable()
 export class StorageService {
-  constructor(private store: TursoStore) {}
+  constructor(
+    private store: TursoStore,
+    private crypto: CryptoService,
+  ) {}
+
+  private decryptStorage(s: StorageEntity): StorageEntity {
+    return {
+      ...s,
+      accessKeyId: this.crypto.decrypt(s.accessKeyId) || s.accessKeyId,
+      secretAccessKey: this.crypto.decrypt(s.secretAccessKey) || s.secretAccessKey,
+    };
+  }
+
+  private encryptStorage(s: Partial<StorageEntity>): Partial<StorageEntity> {
+    return {
+      ...s,
+      accessKeyId: s.accessKeyId ? this.crypto.encrypt(s.accessKeyId) : s.accessKeyId,
+      secretAccessKey: s.secretAccessKey ? this.crypto.encrypt(s.secretAccessKey) : s.secretAccessKey,
+    };
+  }
 
   async findAll(): Promise<StorageEntity[]> {
-    return this.store.getAll<StorageEntity>('storage');
+    const list = await this.store.getAll<StorageEntity>('storage');
+    return list.map((s) => this.decryptStorage(s));
   }
 
   async findOne(id: string): Promise<StorageEntity | null> {
-    return (await this.store.getById<StorageEntity>('storage', id)) || null;
+    const s = (await this.store.getById<StorageEntity>('storage', id)) || null;
+    return s ? this.decryptStorage(s) : null;
   }
 
   async getDefault(): Promise<StorageEntity | null> {
@@ -56,17 +78,17 @@ export class StorageService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    return this.store.create('storage', entity);
+    return this.store.create('storage', this.encryptStorage(entity) as StorageEntity);
   }
 
   async update(
     id: string,
     dto: UpdateStorageDto,
   ): Promise<StorageEntity | null> {
-    return this.store.update<StorageEntity>('storage', id, {
-      ...dto,
-      updatedAt: new Date().toISOString(),
-    });
+    const existing = await this.findOne(id);
+    if (!existing) return null;
+    const merged = { ...existing, ...dto, id, updatedAt: new Date().toISOString() };
+    return this.store.create('storage', this.encryptStorage(merged) as StorageEntity);
   }
 
   async remove(id: string): Promise<void> {

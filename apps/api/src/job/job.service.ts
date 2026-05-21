@@ -56,7 +56,7 @@ export class JobService {
 
   private async databaseSummary(id?: string | null) {
     if (!id) return null;
-    const db = await this.store.getById<any>('databases', id);
+    const db = await this.databaseService.findOne(id);
     if (!db) return null;
     return {
       id: db.id,
@@ -73,7 +73,7 @@ export class JobService {
 
   private async storageSummary(id?: string | null) {
     if (!id) return null;
-    const storage = await this.store.getById<any>('storage', id);
+    const storage = await this.storageService.findOne(id);
     if (!storage) return null;
     return {
       id: storage.id,

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TursoStore } from '../common/turso.store';
+import { CryptoService } from '../common/crypto.service';
 import { DatabaseEntity } from '../entities/database.entity';
 import {
   CreateDatabaseDto,
@@ -9,14 +10,35 @@ import {
 
 @Injectable()
 export class DatabaseService {
-  constructor(private store: TursoStore) {}
+  constructor(
+    private store: TursoStore,
+    private crypto: CryptoService,
+  ) {}
+
+  private decryptDb(db: DatabaseEntity): DatabaseEntity {
+    return {
+      ...db,
+      password: this.crypto.decrypt(db.password || '') || db.password,
+      url: db.url ? this.crypto.decrypt(db.url) || db.url : db.url,
+    };
+  }
+
+  private encryptDb(db: Partial<DatabaseEntity>): Partial<DatabaseEntity> {
+    return {
+      ...db,
+      password: db.password ? this.crypto.encrypt(db.password) : db.password,
+      url: db.url ? this.crypto.encrypt(db.url) : db.url,
+    };
+  }
 
   async findAll(): Promise<DatabaseEntity[]> {
-    return this.store.getAll<DatabaseEntity>('databases');
+    const dbs = await this.store.getAll<DatabaseEntity>('databases');
+    return dbs.map((db) => this.decryptDb(db));
   }
 
   async findOne(id: string): Promise<DatabaseEntity | null> {
-    return (await this.store.getById<DatabaseEntity>('databases', id)) || null;
+    const db = (await this.store.getById<DatabaseEntity>('databases', id)) || null;
+    return db ? this.decryptDb(db) : null;
   }
 
   async create(dto: CreateDatabaseDto): Promise<DatabaseEntity> {
@@ -60,17 +82,17 @@ export class DatabaseService {
 
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
     const entity = { ...data, id } as DatabaseEntity;
-    return this.store.create('databases', entity);
+    return this.store.create('databases', this.encryptDb(entity) as DatabaseEntity);
   }
 
   async update(
     id: string,
     dto: UpdateDatabaseDto,
   ): Promise<DatabaseEntity | null> {
-    return this.store.update<DatabaseEntity>('databases', id, {
-      ...dto,
-      updatedAt: new Date().toISOString(),
-    });
+    const existing = await this.findOne(id);
+    if (!existing) return null;
+    const merged = { ...existing, ...dto, id, updatedAt: new Date().toISOString() };
+    return this.store.create('databases', this.encryptDb(merged) as DatabaseEntity);
   }
 
   async remove(id: string): Promise<void> {
