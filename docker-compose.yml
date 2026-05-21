@@ -6,6 +6,7 @@ services:
       - redis-data:/data
 
   api:
+    image: ghcr.io/l3lackcurtains/database-bak/api:latest
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -27,6 +28,7 @@ services:
       - redis
 
   webapp:
+    image: ghcr.io/l3lackcurtains/database-bak/webapp:latest
     build:
       context: .
       dockerfile: apps/webapp/Dockerfile
