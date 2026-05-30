@@ -100,8 +100,12 @@ export function SnapshotsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this snapshot? This cannot be undone.')) return;
-    await snapshotsApi.delete(id);
-    fetchSnapshots();
+    try {
+      await snapshotsApi.delete(id);
+      fetchSnapshots();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete snapshot');
+    }
   };
 
   const handleDownload = async (id: string) => {

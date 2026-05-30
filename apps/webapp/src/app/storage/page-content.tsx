@@ -31,8 +31,12 @@ export function StoragePage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this storage configuration?')) return;
-    await storageApi.delete(id);
-    fetchStorage();
+    try {
+      await storageApi.delete(id);
+      fetchStorage();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete storage');
+    }
   };
 
   const handleSetDefault = async (id: string) => {

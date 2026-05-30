@@ -59,8 +59,12 @@ export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab })
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this job record?')) return;
-    await jobsApi.delete(id);
-    fetchJobs();
+    try {
+      await jobsApi.delete(id);
+      fetchJobs();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete job');
+    }
   };
 
   const handleTabChange = (tab: JobsTab) => {

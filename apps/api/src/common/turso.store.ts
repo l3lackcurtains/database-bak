@@ -198,7 +198,9 @@ export class TursoStore implements OnModuleInit, OnModuleDestroy {
     const row = toRow(item, collection);
     const now = new Date().toISOString();
     row.createdAt = row.createdAt || now;
-    row.updatedAt = row.updatedAt || now;
+    if (collection !== 'snapshots') {
+      row.updatedAt = row.updatedAt || now;
+    }
     const c = cols(row);
     const placeholders = c.map(() => '?').join(', ');
     await this.client.execute(
@@ -214,7 +216,11 @@ export class TursoStore implements OnModuleInit, OnModuleDestroy {
 
     const merged = { ...existing, ...updates, id };
     const now = new Date().toISOString();
-    merged.updatedAt = now;
+    
+    // Only set updatedAt if the table actually has that column (snapshots does not)
+    if (collection !== 'snapshots') {
+      merged.updatedAt = now;
+    }
 
     const row = toRow(merged, collection);
     delete row.id;

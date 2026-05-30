@@ -20,13 +20,22 @@ async function fetchWithTimeout(
   options: RequestInitWithTimeout = {},
 ): Promise<Response> {
   const { timeout = 30000, ...fetchOptions } = options;
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
+  
+  // Use AbortSignal.timeout if available, or create our own
+  let signal = fetchOptions.signal;
+  let id: NodeJS.Timeout | undefined;
+  
+  if (!signal) {
+    const controller = new AbortController();
+    id = setTimeout(() => controller.abort(new Error('Request Timeout')), timeout);
+    signal = controller.signal;
+  }
+
   try {
-    const response = await fetch(url, { ...fetchOptions, signal: controller.signal });
+    const response = await fetch(url, { ...fetchOptions, signal });
     return response;
   } finally {
-    clearTimeout(id);
+    if (id) clearTimeout(id);
   }
 }
 

@@ -31,8 +31,12 @@ export function DatabasesPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this database connection?')) return;
-    await databasesApi.delete(id);
-    fetchDatabases();
+    try {
+      await databasesApi.delete(id);
+      fetchDatabases();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete database');
+    }
   };
 
   const handleTest = async (db: Partial<Database>) => {
