@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,12 +15,24 @@ import Link from 'next/link';
 type JobsTab = 'scheduled' | 'manual';
 
 export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [jobs, setJobs] = useState<BackupJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [now, setNow] = useState(0);
   const [activeTab, setActiveTab] = useState<JobsTab>(initialTab);
+
+  useEffect(() => {
+    if (initialTab !== activeTab) {
+      setActiveTab(initialTab);
+      setPage(1);
+      setLoading(true);
+    }
+  }, [initialTab]);
 
   const fetchJobs = useCallback(() => {
     jobsApi.list({ page, limit: 20, source: activeTab })
@@ -68,9 +81,14 @@ export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab })
   };
 
   const handleTabChange = (tab: JobsTab) => {
+    if (tab === activeTab) return;
     setLoading(true);
     setActiveTab(tab);
     setPage(1);
+    
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('source', tab);
+    router.replace(`${pathname}?${params.toString()}`);
   };
 
   const statusBadge = (status: string) => {
