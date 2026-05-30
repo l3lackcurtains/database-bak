@@ -609,7 +609,7 @@ export class JobService {
       'jobs',
       (j: JobEntity) =>
         j.status === 'running' &&
-        j.startedAt &&
+        !!j.startedAt &&
         j.startedAt < cutoffTime,
     );
 
