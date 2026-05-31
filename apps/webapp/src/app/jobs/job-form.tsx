@@ -211,7 +211,7 @@ export function JobForm({ job, scheduledOnly = false }: { job?: BackupJob | null
               >
                 <option value="">Select database...</option>
                 {databases.map((db) => (
-                  <option key={db.id} value={db.id}>{db.name} ({db.type})</option>
+                  <option key={db.id} value={db.id}>{db.label || db.name} ({db.type})</option>
                 ))}
               </select>
             </div>
@@ -225,7 +225,7 @@ export function JobForm({ job, scheduledOnly = false }: { job?: BackupJob | null
               >
                 <option value="">Select storage...</option>
                 {storageConfigs.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.provider})</option>
+                  <option key={s.id} value={s.id}>{s.label || s.name} ({s.provider})</option>
                 ))}
               </select>
             </div>

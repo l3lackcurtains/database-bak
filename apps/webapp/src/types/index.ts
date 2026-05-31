@@ -128,6 +128,7 @@ export interface BackupJob {
 export interface JobDatabaseDetails {
   id: string;
   name: string;
+  label?: string;
   type: string;
   host?: string;
   port?: number;
@@ -140,6 +141,7 @@ export interface JobDatabaseDetails {
 export interface JobStorageDetails {
   id: string;
   name: string;
+  label?: string;
   provider: string;
   endpoint: string;
   region: string;

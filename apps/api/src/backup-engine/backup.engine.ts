@@ -16,7 +16,8 @@ export class BackupEngine {
     const stderr: Buffer[] = [];
 
     child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
-    
+    child.stderr.on('error', () => child.stdout.destroy());
+
     child.on('error', (error: NodeJS.ErrnoException) => {
       this.logger.error(`Command ${command} failed to start:`, error);
       child.stdout.destroy(error);
@@ -30,21 +31,40 @@ export class BackupEngine {
       }
     });
 
+    child.stdout.on('error', () => child.kill());
     return child.stdout;
   }
 
-  private async runCommandWithStreamInput(command: string, args: string[], inputStream: Readable): Promise<string> {
+  private async runCommandWithStreamInput(command: string, args: string[], inputStream: Readable, timeoutMs = 1800_000): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn(command, args, { stdio: ['pipe', 'ignore', 'pipe'] });
       const stderr: Buffer[] = [];
+      let closed = false;
+      let timer: NodeJS.Timeout | null = null;
 
       child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
-      
+      child.stderr.on('error', () => {});
+
+      const done = (err?: Error) => {
+        if (closed) return;
+        closed = true;
+        if (timer) clearTimeout(timer);
+        child.stdin?.destroy();
+        child.kill();
+        inputStream.destroy(err);
+        if (err) reject(err);
+      };
+
+      timer = setTimeout(() => done(new Error(`${command} timed out after ${timeoutMs / 1000}s`)), timeoutMs);
+
       child.on('error', (error: NodeJS.ErrnoException) => {
-        reject(error);
+        done(error);
       });
-      
+
       child.on('close', (code) => {
+        if (timer) clearTimeout(timer);
+        if (closed) return;
+        closed = true;
         const stderrText = Buffer.concat(stderr).toString('utf-8').trim();
         if (code === 0) {
           resolve(stderrText);
@@ -53,6 +73,15 @@ export class BackupEngine {
         reject(new Error(stderrText || `${command} exited with code ${code}`));
       });
 
+      child.stdin?.on('error', () => {
+        if (!closed) {
+          this.logger.warn(`${command} stdin pipe closed before stream ended`);
+          child.stdin?.destroy();
+        }
+      });
+      inputStream.on('error', (err) => {
+        if (!closed) done(err);
+      });
       inputStream.pipe(child.stdin);
     });
   }
@@ -184,14 +213,46 @@ export class BackupEngine {
     options: { cleanBeforeRestore?: boolean },
   ): Promise<void> {
     const uri = db.url || `postgresql://${db.username}:${db.password}@${db.host}:${db.port}/${db.database}`;
-    
-    // pg_restore reads custom format
+
+    await this.ensurePostgresDatabase(db);
+
     const args = ['--dbname', uri, '-d', db.database];
     if (options.cleanBeforeRestore) {
       args.push('--clean', '--if-exists');
     }
 
     await this.runCommandWithStreamInput('pg_restore', args, archiveStream);
+  }
+
+  private async ensurePostgresDatabase(db: any): Promise<void> {
+    const { Client } = await import('pg');
+    const targetClient = new Client(
+      db.url
+        ? { connectionString: db.url, ssl: db.ssl ? { rejectUnauthorized: false } : undefined, connectionTimeoutMillis: 5000 }
+        : { host: db.host, port: db.port, database: db.database, user: db.username, password: db.password, ssl: db.ssl ? { rejectUnauthorized: false } : false, connectionTimeoutMillis: 5000 },
+    );
+    try {
+      await targetClient.connect();
+      await targetClient.end();
+      return;
+    } catch (err: any) {
+      if (!err.message?.includes('does not exist')) throw err;
+    }
+
+    const maintenanceClient = new Client(
+      db.url
+        ? { connectionString: db.url.replace(`/${db.database}`, '/postgres'), ssl: db.ssl ? { rejectUnauthorized: false } : undefined, connectionTimeoutMillis: 5000 }
+        : { host: db.host, port: db.port, database: 'postgres', user: db.username, password: db.password, ssl: db.ssl ? { rejectUnauthorized: false } : false, connectionTimeoutMillis: 5000 },
+    );
+    await maintenanceClient.connect();
+    try {
+      await maintenanceClient.query(`CREATE DATABASE "${db.database}"`);
+      this.logger.log(`Created database ${db.database}`);
+    } catch (err: any) {
+      if (!err.message?.includes('already exists')) throw err;
+    } finally {
+      await maintenanceClient.end();
+    }
   }
 
   private async dumpMongoDB(db: any): Promise<{
@@ -240,17 +301,32 @@ export class BackupEngine {
     }
   }
 
+  private mongoRestoreUri(db: any): string {
+    const auth = db.username
+      ? `${db.username}${db.password ? `:${db.password}` : ''}@`
+      : '';
+    const uri = db.url || `mongodb://${auth}${db.host}:${db.port}/${db.database}`;
+    try {
+      const parsed = new URL(uri.replace(/^mongodb\+srv:\/\//, 'mongodb://'));
+      const authSource = parsed.searchParams.get('authSource');
+      if (authSource === db.database || (!authSource && parsed.pathname.replace(/^\/+/, '') === db.database)) {
+        parsed.searchParams.set('authSource', 'admin');
+        return uri.startsWith('mongodb+srv://')
+          ? parsed.toString().replace(/^mongodb:\/\//, 'mongodb+srv://')
+          : parsed.toString();
+      }
+    } catch {}
+    return uri;
+  }
+
   private async restoreMongoDB(
     db: any,
     snapshot: { metadata?: Record<string, any> | null },
     archiveStream: Readable,
     options: { cleanBeforeRestore?: boolean },
   ): Promise<void> {
-    const auth = db.username
-      ? `${db.username}${db.password ? `:${db.password}` : ''}@`
-      : '';
-    const uri = db.url || `mongodb://${auth}${db.host}:${db.port}/${db.database}`;
-    
+    const uri = this.mongoRestoreUri(db);
+
     // Explicitly clean the target database before restoring if requested
     if (options.cleanBeforeRestore && db.database) {
       this.logger.log(`Cleaning target database ${db.database} before restore`);

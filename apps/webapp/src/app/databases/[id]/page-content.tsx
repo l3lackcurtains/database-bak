@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Database as DatabaseIcon, HardDrive, CalendarClock, Server, Globe, ShieldCheck, Activity, Copy, Trash2, Lock } from 'lucide-react';
+import { ArrowLeft, Database as DatabaseIcon, HardDrive, CalendarClock, Server, Globe, ShieldCheck, Activity, Copy, Trash2, Lock, Pencil, Check, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -77,6 +77,31 @@ export function DatabaseDetailsPage({ params }: { params: Promise<{ id: string }
     }
   };
 
+  const [editingLabel, setEditingLabel] = useState(false);
+  const [labelValue, setLabelValue] = useState('');
+
+  const startEditLabel = () => {
+    if (!db) return;
+    setLabelValue(db.label || db.name);
+    setEditingLabel(true);
+  };
+
+  const saveLabel = async () => {
+    if (!db) return;
+    try {
+      const updated = await databasesApi.update(id, { label: labelValue === db.name ? '' : labelValue });
+      setDb(prev => prev ? { ...prev, label: labelValue === db.name ? '' : labelValue } : null);
+      setEditingLabel(false);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update label');
+    }
+  };
+
+  const cancelEditLabel = () => {
+    setEditingLabel(false);
+    setLabelValue('');
+  };
+
   const handleDelete = async () => {
     if (!db || !confirm('Delete this database connection?')) return;
     await databasesApi.delete(id);
@@ -99,7 +124,24 @@ export function DatabaseDetailsPage({ params }: { params: Promise<{ id: string }
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-2xl font-bold tracking-tight">{db.label || db.name}</h1>
+            {editingLabel ? (
+              <div className="flex items-center gap-2">
+                <input
+                  className="h-9 rounded-md border border-input bg-background px-3 py-1 text-xl font-bold tracking-tight"
+                  value={labelValue}
+                  onChange={(e) => setLabelValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') saveLabel(); if (e.key === 'Escape') cancelEditLabel(); }}
+                  autoFocus
+                />
+                <button onClick={saveLabel} className="text-green-600 hover:text-green-700"><Check className="h-5 w-5" /></button>
+                <button onClick={cancelEditLabel} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-2xl font-bold tracking-tight">{db.label || db.name}</h1>
+                <button onClick={startEditLabel} className="text-muted-foreground hover:text-foreground"><Pencil className="h-4 w-4" /></button>
+              </div>
+            )}
             {typeBadge(db.type)}
           </div>
           <p className="text-muted-foreground">{db.host}:{db.port}/{db.database}</p>
@@ -224,9 +266,26 @@ export function DatabaseDetailsPage({ params }: { params: Promise<{ id: string }
             <CardContent className="space-y-4">
               <div className="flex items-start gap-2">
                 <DatabaseIcon className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                <div>
-                  <div className="font-medium">{db.label ? 'Label' : 'Name'}</div>
-                  <div className="text-muted-foreground">{db.label || db.name}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium">Label</div>
+                  {editingLabel ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        className="h-7 w-full min-w-0 rounded border border-input bg-background px-2 py-1 text-sm"
+                        value={labelValue}
+                        onChange={(e) => setLabelValue(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveLabel(); if (e.key === 'Escape') cancelEditLabel(); }}
+                        autoFocus
+                      />
+                      <button onClick={saveLabel} className="text-green-600 shrink-0"><Check className="h-4 w-4" /></button>
+                      <button onClick={cancelEditLabel} className="text-muted-foreground shrink-0"><X className="h-4 w-4" /></button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <span className="text-muted-foreground truncate">{db.label || db.name}</span>
+                      <button onClick={startEditLabel} className="text-muted-foreground hover:text-foreground shrink-0"><Pencil className="h-3 w-3" /></button>
+                    </div>
+                  )}
                 </div>
               </div>
               <DetailRow label="Type" value={db.type} />

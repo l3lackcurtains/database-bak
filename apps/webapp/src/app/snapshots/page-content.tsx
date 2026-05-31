@@ -7,8 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { jobsApi, snapshotsApi } from '@/lib/api-routes';
-import type { BackupJob, Snapshot } from '@/types';
+import { databasesApi, jobsApi, snapshotsApi } from '@/lib/api-routes';
+import type { BackupJob, Database, Snapshot } from '@/types';
 import { formatBytes, formatDate } from '@/lib/utils';
 import { Play, RefreshCw, Trash2, Download, RotateCcw } from 'lucide-react';
 
@@ -18,6 +18,7 @@ export function SnapshotsPage() {
   const router = useRouter();
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [jobs, setJobs] = useState<BackupJob[]>([]);
+  const [dbMap, setDbMap] = useState<Map<string, Database>>(new Map());
   const [loading, setLoading] = useState(true);
   const [bulkWorking, setBulkWorking] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -29,8 +30,9 @@ export function SnapshotsPage() {
     Promise.all([
       snapshotsApi.list({ page, limit: PAGE_SIZE }),
       jobsApi.list({ limit: 100, type: 'backup' }),
+      databasesApi.list(),
     ])
-      .then(([snapshotRes, jobRes]) => {
+      .then(([snapshotRes, jobRes, dbs]) => {
         if (snapshotRes.total > 0 && page > snapshotRes.totalPages) {
           setPage(snapshotRes.totalPages);
           return;
@@ -40,6 +42,7 @@ export function SnapshotsPage() {
         setTotal(snapshotRes.total);
         setTotalPages(snapshotRes.totalPages);
         setJobs(jobRes.data);
+        setDbMap(new Map(dbs.map((db: Database) => [db.id, db])));
         setSelectedIds(new Set());
       })
       .catch(console.error)
@@ -250,7 +253,7 @@ export function SnapshotsPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <button className="max-w-[220px] truncate font-medium text-left hover:underline cursor-pointer" onClick={() => router.push(`/snapshots/${s.id}`)}>{s.databaseName}</button>
+                        <button className="max-w-[220px] truncate font-medium text-left hover:underline cursor-pointer" onClick={() => router.push(`/snapshots/${s.id}`)}>{dbMap.get(s.databaseId)?.label || dbMap.get(s.databaseId)?.name || s.databaseName}</button>
                       </TableCell>
                       <TableCell><Badge variant="secondary" className="capitalize">{s.databaseType}</Badge></TableCell>
                       <TableCell>{sourceBadge(s)}</TableCell>

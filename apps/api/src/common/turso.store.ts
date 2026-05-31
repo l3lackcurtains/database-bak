@@ -144,7 +144,14 @@ export class TursoStore implements OnModuleInit, OnModuleDestroy {
     for (const stmt of MIGRATIONS) {
       try { await this.client.execute(stmt); } catch {}
     }
+    await this.seedLabels();
     await this.seedAdminUser();
+  }
+
+  private async seedLabels() {
+    for (const table of ['databases', 'storage']) {
+      try { await this.client.execute(`UPDATE ${table} SET label = name WHERE label IS NULL`); } catch {}
+    }
   }
 
   private async seedAdminUser() {

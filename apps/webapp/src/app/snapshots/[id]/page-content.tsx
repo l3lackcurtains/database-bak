@@ -242,7 +242,7 @@ export function SnapshotDetailsPage({ params }: { params: Promise<{ id: string }
                   <div className="flex items-start gap-2">
                     <DatabaseIcon className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="font-medium">{db.name}</div>
+                      <div className="font-medium">{db.label || db.name}</div>
                       <div className="break-all text-sm text-muted-foreground">{db.host}:{db.port}</div>
                     </div>
                   </div>
@@ -267,7 +267,7 @@ export function SnapshotDetailsPage({ params }: { params: Promise<{ id: string }
                   <div className="flex items-start gap-2">
                     <HardDrive className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="font-medium">{storage.name}</div>
+                      <div className="font-medium">{storage.label || storage.name}</div>
                       <div className="text-sm text-muted-foreground">{storage.bucket}</div>
                     </div>
                   </div>

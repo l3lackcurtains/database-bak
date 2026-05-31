@@ -63,6 +63,7 @@ export class JobService {
     return {
       id: db.id,
       name: db.name,
+      label: db.label,
       type: db.type,
       host: db.host,
       port: db.port,
@@ -80,6 +81,7 @@ export class JobService {
     return {
       id: storage.id,
       name: storage.name,
+      label: storage.label,
       provider: storage.provider,
       endpoint: storage.endpoint,
       region: storage.region,
@@ -237,8 +239,8 @@ export class JobService {
       id,
       name: dto.name,
       databaseId: dto.databaseId,
-      databaseName: db.name,
       storageId: dto.storageId,
+      databaseName: db.label || db.name,
       type: dto.type,
       status: 'pending',
       schedule: this.buildSchedule(dto.schedule),
@@ -279,7 +281,7 @@ export class JobService {
     if (dto.databaseId && dto.databaseId !== existing.databaseId) {
       const db = await this.databaseService.findOne(dto.databaseId);
       if (!db) throw new BadRequestException('Database not found');
-      databaseName = db.name;
+      databaseName = db.label || db.name;
     }
 
     if (dto.storageId && dto.storageId !== existing.storageId) {
@@ -450,7 +452,7 @@ export class JobService {
 
     const snapshot = await this.snapshotService.create({
       databaseId: db.id,
-      databaseName: db.name,
+      databaseName: db.label || db.name,
       databaseType: db.type,
       storageId: storage.id,
       sourceType: job?.schedule ? 'scheduled' : 'manual',

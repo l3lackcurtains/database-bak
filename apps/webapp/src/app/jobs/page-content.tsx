@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { jobsApi } from '@/lib/api-routes';
 import type { BackupJob, JobDatabaseDetails } from '@/types';
-import { formatDate, formatDuration } from '@/lib/utils';
+import { formatDate, formatDuration, formatRelative } from '@/lib/utils';
 import { ArrowRight, CalendarClock, Clock, Database, Edit3, HardDrive, Pause, Play, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -119,7 +119,7 @@ export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab })
 
   const nextRunLabel = (job: BackupJob) => {
     if (job.status === 'running') return 'Running now';
-    if (!job.schedule) return job.completedAt ? `Finished ${formatDate(job.completedAt)}` : 'Runs immediately';
+    if (!job.schedule) return job.completedAt ? `Finished ${formatRelative(job.completedAt)}` : 'Runs immediately';
     if (!job.schedule.nextRunAt) return 'Next run is being calculated';
     if (!now) return formatDate(job.schedule.nextRunAt);
 
@@ -139,7 +139,8 @@ export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab })
 
   const databaseTarget = (db: JobDatabaseDetails | null | undefined) => {
     if (!db) return 'Unknown database';
-    return `${db.name} (${db.host || 'unknown'}${db.port ? `:${db.port}` : ''}/${db.database || db.name})`;
+    const displayName = db.label || db.name;
+    return `${displayName} (${db.host || 'unknown'}${db.port ? `:${db.port}` : ''}/${db.database || db.name})`;
   };
 
   if (loading) {
@@ -216,11 +217,11 @@ export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab })
                               </div>
                               <div className="flex min-w-0 items-center gap-2">
                                 <span className="truncate" title={databaseTarget(job.details?.sourceDatabase)}>
-                                  {job.details?.sourceDatabase?.name || job.details?.snapshot?.databaseName || 'Source'}
+                                  {(job.details?.sourceDatabase?.label || job.details?.sourceDatabase?.name) || job.details?.snapshot?.databaseName || 'Source'}
                                 </span>
                                 <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                                 <span className="truncate" title={databaseTarget(job.details?.destinationDatabase)}>
-                                  {job.details?.destinationDatabase?.name || job.databaseName}
+                                  {(job.details?.destinationDatabase?.label || job.details?.destinationDatabase?.name) || job.databaseName}
                                 </span>
                               </div>
                             </div>
@@ -229,7 +230,7 @@ export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab })
                               <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
                                 <Database className="h-3.5 w-3.5" /> Source
                               </div>
-                              <div className="truncate" title={databaseTarget(job.details?.sourceDatabase)}>{job.databaseName}</div>
+                              <div className="truncate" title={databaseTarget(job.details?.sourceDatabase)}>{job.details?.sourceDatabase?.label || job.details?.sourceDatabase?.name || job.databaseName}</div>
                             </div>
                           )}
                           <div className="min-w-0 space-y-1">
@@ -238,7 +239,7 @@ export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab })
                             </div>
                             <div>{scheduleLabel(job)}</div>
                             {job.schedule?.nextRunAt && (
-                              <div className="text-xs text-muted-foreground">{formatDate(job.schedule.nextRunAt)}</div>
+                              <div className="text-xs text-muted-foreground">{formatRelative(job.schedule.nextRunAt)}</div>
                             )}
                           </div>
                           <div className="min-w-0 space-y-1">

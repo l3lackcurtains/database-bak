@@ -45,7 +45,8 @@ function nextRunText(job: BackupJob) {
 
 function databaseTarget(db: JobDatabaseDetails | null | undefined) {
   if (!db) return 'Unknown database';
-  return `${db.host || 'unknown'}${db.port ? `:${db.port}` : ''}/${db.database || db.name}`;
+  const displayName = db.label || db.name;
+  return `${displayName} (${db.host || 'unknown'}${db.port ? `:${db.port}` : ''}/${db.database || db.name})`;
 }
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -196,7 +197,7 @@ export function JobDetailsPage({ params }: { params: Promise<{ id: string }> }) 
                   <div className="mb-2 flex items-center gap-2 font-medium">
                     <Database className="h-4 w-4 text-muted-foreground" /> Source
                   </div>
-                  <DetailRow label="Name" value={job.details?.sourceDatabase?.name || job.details?.snapshot?.databaseName || 'Unknown'} />
+                  <DetailRow label="Name" value={(job.details?.sourceDatabase?.label || job.details?.sourceDatabase?.name) || job.details?.snapshot?.databaseName || 'Unknown'} />
                   <DetailRow label="Target" value={databaseTarget(job.details?.sourceDatabase)} />
                   <DetailRow label="Type" value={job.details?.sourceDatabase?.type || job.details?.snapshot?.databaseType || job.type} />
                   <DetailRow label="Snapshot" value={job.details?.snapshot?.id || job.options.snapshotId || 'Unknown'} />
@@ -213,7 +214,7 @@ export function JobDetailsPage({ params }: { params: Promise<{ id: string }> }) 
                   <div className="mb-2 flex items-center gap-2 font-medium">
                     <Database className="h-4 w-4 text-muted-foreground" /> Destination
                   </div>
-                  <DetailRow label="Name" value={job.details?.destinationDatabase?.name || job.databaseName} />
+                  <DetailRow label="Name" value={job.details?.destinationDatabase?.label || job.details?.destinationDatabase?.name || job.databaseName} />
                   <DetailRow label="Target" value={databaseTarget(job.details?.destinationDatabase)} />
                   <DetailRow label="Type" value={job.details?.destinationDatabase?.type || job.type} />
                   <DetailRow label="Clean first" value={job.options.cleanBeforeRestore ? 'Yes' : 'No'} />
@@ -224,7 +225,7 @@ export function JobDetailsPage({ params }: { params: Promise<{ id: string }> }) 
                 <div className="mb-2 flex items-center gap-2 font-medium">
                   <HardDrive className="h-4 w-4 text-muted-foreground" /> Storage
                 </div>
-                <DetailRow label="Name" value={job.details?.storage?.name || job.storageId} />
+                <DetailRow label="Name" value={job.details?.storage?.label || job.details?.storage?.name || job.storageId} />
                 <DetailRow label="Bucket" value={job.details?.storage?.bucket || 'Unknown'} />
                 <DetailRow label="Endpoint" value={job.details?.storage?.endpoint || 'Unknown'} />
                 <DetailRow label="Object" value={job.details?.snapshot?.storageKey || 'Unknown'} />

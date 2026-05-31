@@ -146,7 +146,7 @@ export function RestoreSnapshotPage({ params }: { params: Promise<{ id: string }
                   <option value="">Select database...</option>
                   {databases.map((db) => (
                     <option key={db.id} value={db.id}>
-                      {db.name} ({db.type}) - {db.database}
+                      {db.label || db.name} ({db.type}) - {db.database}
                     </option>
                   ))}
                 </select>
@@ -280,7 +280,7 @@ export function RestoreSnapshotPage({ params }: { params: Promise<{ id: string }
             </div>
             <div className="p-4 space-y-4">
               <p className="text-sm">
-                You are about to restore the snapshot <strong>{snapshot.databaseName}</strong> to the target database <strong>{databases.find(db => db.id === targetDatabaseId)?.name || 'Unknown'}</strong>.
+                You are about to restore the snapshot <strong>{snapshot.databaseName}</strong> to the target database <strong>{targetDatabase ? (targetDatabase.label || targetDatabase.name) : 'Unknown'}</strong>.
               </p>
               {cleanBeforeRestore && (
                 <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">

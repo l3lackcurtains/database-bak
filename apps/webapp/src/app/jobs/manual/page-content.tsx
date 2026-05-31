@@ -109,7 +109,7 @@ export function ManualBackupPage() {
                   <option value="">Select database...</option>
                   {databases.map((database) => (
                     <option key={database.id} value={database.id}>
-                      {database.name} ({database.type})
+                      {database.label || database.name} ({database.type})
                     </option>
                   ))}
                 </select>
@@ -126,7 +126,7 @@ export function ManualBackupPage() {
                   <option value="">Select storage...</option>
                   {storageConfigs.map((storage) => (
                     <option key={storage.id} value={storage.id}>
-                      {storage.name} ({storage.provider})
+                      {storage.label || storage.name} ({storage.provider})
                     </option>
                   ))}
                 </select>

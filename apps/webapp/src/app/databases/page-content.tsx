@@ -311,6 +311,15 @@ export function DatabaseForm({
                   <p><span className="font-medium">Host:</span> {form.host}:{form.port}</p>
                   <p><span className="font-medium">Database:</span> {form.database}</p>
                   <p><span className="font-medium">Username:</span> {form.username}</p>
+                  <div className="pt-2 border-t border-border mt-2">
+                    <label className="text-xs font-medium">Label <span className="text-muted-foreground">(optional)</span></label>
+                    <input
+                      className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-xs"
+                      value={form.label}
+                      onChange={(e) => setForm({ ...form, label: e.target.value })}
+                      placeholder="Display name"
+                    />
+                  </div>
                 </div>
               )}
             </div>
