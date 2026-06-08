@@ -1,5 +1,4 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { connect } from '@tursodatabase/serverless';
 import * as bcrypt from 'bcryptjs';
 import { setAuthConfiguredViaDb } from './auth-config';
 
@@ -115,7 +114,7 @@ interface DbClient {
 }
 
 class TursoClient implements DbClient {
-  constructor(private client: ReturnType<typeof connect>) {}
+  constructor(private client: any) {}
 
   execute(sql: string, params: any[] = []): Promise<QueryResult> {
     return this.client.execute(sql, params).then((result: any) => ({
@@ -134,7 +133,9 @@ class TursoClient implements DbClient {
 export class TursoStore implements OnModuleInit, OnModuleDestroy {
   private client!: DbClient;
 
-  constructor() {
+  constructor() {}
+
+  async onModuleInit() {
     const url = process.env.TURSO_DB_URL || '';
     const authToken = process.env.TURSO_AUTH_TOKEN || '';
 
@@ -142,10 +143,9 @@ export class TursoStore implements OnModuleInit, OnModuleDestroy {
       throw new Error('TURSO_DB_URL environment variable is required');
     }
 
+    const { connect } = await (eval('import("@tursodatabase/serverless")') as Promise<any>);
     this.client = new TursoClient(connect({ url, authToken }));
-  }
 
-  async onModuleInit() {
     for (const sql of SCHEMAS) {
       await this.client.execute(sql);
     }

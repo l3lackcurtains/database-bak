@@ -1,7 +1,7 @@
 import { BadRequestException, Body, ConflictException, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import * as bcrypt from 'bcryptjs';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'crypto';
 import { TursoStore } from '../common/turso.store';
 import { getUserFromRequest } from './session';
 import { requireAdmin } from './require-admin';
@@ -48,7 +48,7 @@ export class UsersController {
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const now = new Date().toISOString();
     const user = {
-      id: uuid(),
+      id: randomUUID(),
       username: dto.username,
       passwordHash,
       role: dto.role || 'admin',
