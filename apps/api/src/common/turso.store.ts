@@ -164,20 +164,22 @@ export class TursoStore implements OnModuleInit, OnModuleDestroy {
 
   private async seedAdminUser() {
     const username = process.env.DASHBOARD_USERNAME || 'admin';
-    const password = process.env.DASHBOARD_PASSWORD || 'changeme';
-    const passwordHash = await bcrypt.hash(password, 10);
+    const envPassword = process.env.DASHBOARD_PASSWORD;
     const now = new Date().toISOString();
 
     const existingAdmin = await this.findByUsername(username);
 
     if (!existingAdmin) {
+      const password = envPassword || 'changeme';
+      const passwordHash = await bcrypt.hash(password, 10);
       const adminId = crypto.randomUUID();
       await this.client.execute(
         'INSERT INTO users (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
         [adminId, username, passwordHash, 'admin', now, now],
       );
-    } else {
-      // Overwrite/sync password hash to match what is defined in .env
+    } else if (envPassword) {
+      // Only overwrite/sync password hash if DASHBOARD_PASSWORD is explicitly defined in .env
+      const passwordHash = await bcrypt.hash(envPassword, 10);
       await this.client.execute(
         'UPDATE users SET passwordHash = ?, updatedAt = ? WHERE username = ?',
         [passwordHash, now, username],
