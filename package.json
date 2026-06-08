@@ -7,7 +7,9 @@
     "lint": "turbo lint",
     "format": "prettier --write '**/*.{ts,tsx,md}'",
     "kill-ports": "fuser -k 7301/tcp 7300/tcp 2>/dev/null; true",
-    "reset": "fuser -k 7301/tcp 7300/tcp 2>/dev/null; true && turbo dev"
+    "reset": "fuser -k 7301/tcp 7300/tcp 2>/dev/null; true && turbo dev",
+    "db:seed": "pnpm --filter=@database-bak/api db:seed",
+    "db:reset-password": "pnpm --filter=@database-bak/api db:reset-password"
   },
   "devDependencies": {
     "prettier": "^3.2.5",

@@ -131,7 +131,7 @@ class TursoClient implements DbClient {
 
 @Injectable()
 export class TursoStore implements OnModuleInit, OnModuleDestroy {
-  private client!: DbClient;
+  public client!: DbClient;
 
   constructor() {}
 
@@ -153,59 +153,17 @@ export class TursoStore implements OnModuleInit, OnModuleDestroy {
       try { await this.client.execute(stmt); } catch {}
     }
     await this.seedLabels();
-    await this.seedAdminUser();
+
+    const rs = await this.client.execute('SELECT COUNT(*) as cnt FROM users');
+    const userCount = Number((rs.rows[0] as any[])[0]);
+    if (userCount > 0) {
+      setAuthConfiguredViaDb(true);
+    }
   }
 
   private async seedLabels() {
     for (const table of ['databases', 'storage']) {
       try { await this.client.execute(`UPDATE ${table} SET label = name WHERE label IS NULL`); } catch {}
-    }
-  }
-
-  private async seedAdminUser() {
-    const username = process.env.DASHBOARD_USERNAME || 'admin';
-    const envPassword = process.env.DASHBOARD_PASSWORD;
-    const now = new Date().toISOString();
-
-    const existingAdmin = await this.findByUsername(username);
-
-    if (!existingAdmin) {
-      const password = envPassword || 'changeme';
-      const passwordHash = await bcrypt.hash(password, 10);
-      const adminId = crypto.randomUUID();
-      await this.client.execute(
-        'INSERT INTO users (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
-        [adminId, username, passwordHash, 'admin', now, now],
-      );
-    } else if (envPassword) {
-      // Only overwrite/sync password hash if DASHBOARD_PASSWORD is explicitly defined in .env
-      const passwordHash = await bcrypt.hash(envPassword, 10);
-      await this.client.execute(
-        'UPDATE users SET passwordHash = ?, updatedAt = ? WHERE username = ?',
-        [passwordHash, now, username],
-      );
-    }
-    setAuthConfiguredViaDb(true);
-
-    // Seed 1 more user (operator) if there's only 1 user (or if operator doesn't exist)
-    const existingOperator = await this.findByUsername('operator');
-    if (!existingOperator) {
-      const operatorId = crypto.randomUUID();
-      const operatorHash = await bcrypt.hash('operatorpass', 10);
-      await this.client.execute(
-        'INSERT INTO users (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
-        [operatorId, 'operator', operatorHash, 'operator', now, now],
-      );
-    }
-
-    // Now, run the migration to sync old null userId records to the primary admin
-    const adminUser = await this.findByUsername(username);
-    if (adminUser) {
-      for (const table of ['databases', 'storage', 'jobs', 'snapshots']) {
-        try {
-          await this.client.execute(`UPDATE ${table} SET userId = ? WHERE userId IS NULL`, [adminUser.id]);
-        } catch {}
-      }
     }
   }
 
