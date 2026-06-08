@@ -19,24 +19,26 @@ import {
   Sun,
   Moon,
   User,
+  Users,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-
-const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
-  { icon: ArrowLeftRight, label: 'Jobs', href: '/jobs' },
-  { icon: Database, label: 'Databases', href: '/databases' },
-  { icon: Archive, label: 'Snapshots', href: '/snapshots' },
-  { icon: HardDrive, label: 'Storage', href: '/storage' },
-  { icon: Settings, label: 'Settings', href: '/settings' },
-];
 
 export function Sidebar() {
   const { collapsed, toggle } = useSidebarStore();
   const { resolvedTheme, toggleTheme } = useThemeStore();
   const pathname = usePathname();
   const { user, fetchUser, logout } = useAuthStore();
+
+  const navItems = [
+    { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
+    { icon: ArrowLeftRight, label: 'Jobs', href: '/jobs' },
+    { icon: Database, label: 'Databases', href: '/databases' },
+    { icon: Archive, label: 'Snapshots', href: '/snapshots' },
+    { icon: HardDrive, label: 'Storage', href: '/storage' },
+    ...(user?.role === 'admin' ? [{ icon: Users, label: 'Users', href: '/users' }] : []),
+    { icon: Settings, label: 'Settings', href: '/settings' },
+  ];
 
   useEffect(() => {
     fetchUser();
