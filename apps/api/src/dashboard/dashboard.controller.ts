@@ -1,7 +1,9 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Req } from '@nestjs/common';
 import { TursoStore } from '../common/turso.store';
 import { JobEntity } from '../entities/job.entity';
 import { SnapshotEntity } from '../entities/snapshot.entity';
+import type { Request } from 'express';
+import { getUserFromRequest } from '../auth/session';
 
 interface DashboardStats {
   totalDatabases: number;
@@ -18,9 +20,19 @@ export class DashboardController {
   constructor(private store: TursoStore) {}
 
   @Get('stats')
-  async getStats(): Promise<DashboardStats> {
-    const jobs = await this.store.getAll<JobEntity>('jobs');
-    const snapshots = await this.store.getAll<SnapshotEntity>('snapshots');
+  async getStats(@Req() req: Request): Promise<DashboardStats> {
+    const user = getUserFromRequest(req)!;
+    
+    let jobs = await this.store.getAll<JobEntity>('jobs');
+    let snapshots = await this.store.getAll<SnapshotEntity>('snapshots');
+    let databases = await this.store.getAll<any>('databases');
+
+    if (user && user.role !== 'admin') {
+      jobs = jobs.filter((j: any) => j.userId === user.id || !j.userId);
+      snapshots = snapshots.filter((s: any) => s.userId === user.id || !s.userId);
+      databases = databases.filter((db: any) => db.userId === user.id || !db.userId);
+    }
+
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
@@ -51,7 +63,7 @@ export class DashboardController {
     );
 
     return {
-      totalDatabases: await this.store.count('databases'),
+      totalDatabases: databases.length,
       totalSnapshots: snapshots.length,
       totalStorageUsed,
       activeJobs,

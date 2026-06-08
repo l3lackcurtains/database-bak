@@ -212,13 +212,13 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {stats?.failedBackups24h && stats.failedBackups24h > 0 && (
+      {Boolean(stats?.failedBackups24h && stats.failedBackups24h > 0) && (
         <Card className="border-destructive/50">
           <CardContent className="flex items-center gap-3 pt-6">
             <AlertCircle className="h-5 w-5 text-destructive" />
             <div>
               <p className="text-sm font-medium text-destructive">
-                {stats.failedBackups24h} failed backup(s) in the last 24 hours
+                {stats?.failedBackups24h} failed backup(s) in the last 24 hours
               </p>
               <Link href="/jobs?status=failed" className="text-sm text-destructive underline">
                 View failed jobs
