@@ -14,4 +14,5 @@ export interface DatabaseEntity {
   ssl: boolean;
   createdAt: string;
   updatedAt: string;
+  userId: string | null;
 }

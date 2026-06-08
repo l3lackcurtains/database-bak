@@ -20,13 +20,13 @@ export class JobController {
 
   @Get()
   findAll(
+    @Req() req: Request,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
     @Query('status') status?: string,
     @Query('type') type?: string,
     @Query('source') source?: string,
     @Query('databaseId') databaseId?: string,
-    @Req() req: Request,
   ) {
     const user = getUserFromRequest(req)!;
     return this.service.findAll(parseInt(page), parseInt(limit), status, type, source, databaseId, user);

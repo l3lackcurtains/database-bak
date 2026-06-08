@@ -22,4 +22,5 @@ export interface StorageEntity {
   status: StorageStatus;
   createdAt: string;
   updatedAt: string;
+  userId: string | null;
 }

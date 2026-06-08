@@ -58,6 +58,7 @@ export interface JobEntity {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  userId: string | null;
   details?: {
     sourceDatabase: JobDatabaseDetails | null;
     destinationDatabase: JobDatabaseDetails | null;

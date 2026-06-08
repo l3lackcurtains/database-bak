@@ -25,10 +25,10 @@ export class SnapshotController {
 
   @Get()
   findAll(
+    @Req() req: Request,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
     @Query('databaseId') databaseId?: string,
-    @Req() req: Request,
   ) {
     const user = getUserFromRequest(req)!;
     return this.snapshotService.findAll(

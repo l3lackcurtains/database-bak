@@ -29,4 +29,5 @@ export interface SnapshotEntity {
     recordCount?: number;
   } | null;
   createdAt: string;
+  userId: string | null;
 }

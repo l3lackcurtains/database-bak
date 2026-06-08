@@ -165,24 +165,36 @@ export class TursoStore implements OnModuleInit, OnModuleDestroy {
   private async seedAdminUser() {
     const rs = await this.client.execute('SELECT COUNT(*) as cnt FROM users');
     const userCount = Number((rs.rows[0] as any[])[0]);
+    let adminId: string | null = null;
 
     if (userCount > 0) {
       setAuthConfiguredViaDb(true);
-      return;
+      const adminRs = await this.client.execute("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+      if (adminRs.rows[0]) {
+        adminId = String((adminRs.rows[0] as any[])[0]);
+      }
+    } else {
+      const username = process.env.DASHBOARD_USERNAME;
+      const password = process.env.DASHBOARD_PASSWORD;
+      if (username && password) {
+        const passwordHash = await bcrypt.hash(password, 10);
+        const now = new Date().toISOString();
+        adminId = crypto.randomUUID();
+        await this.client.execute(
+          'INSERT INTO users (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+          [adminId, username, passwordHash, 'admin', now, now],
+        );
+        setAuthConfiguredViaDb(true);
+      }
     }
 
-    const username = process.env.DASHBOARD_USERNAME;
-    const password = process.env.DASHBOARD_PASSWORD;
-    if (!username || !password) return;
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const now = new Date().toISOString();
-    const id = crypto.randomUUID();
-    await this.client.execute(
-      'INSERT INTO users (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, username, passwordHash, 'admin', now, now],
-    );
-    setAuthConfiguredViaDb(true);
+    if (adminId) {
+      for (const table of ['databases', 'storage', 'jobs', 'snapshots']) {
+        try {
+          await this.client.execute(`UPDATE ${table} SET userId = ? WHERE userId IS NULL`, [adminId]);
+        } catch {}
+      }
+    }
   }
 
   async onModuleDestroy() {
