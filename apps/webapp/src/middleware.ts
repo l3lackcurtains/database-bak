@@ -35,8 +35,6 @@ function unauthorizedJson() {
 }
 
 export default async function middleware(request: NextRequest) {
-  if (!authConfigured()) return NextResponse.next();
-
   const { pathname } = request.nextUrl;
   const isLoginPage = pathname === '/login';
   const isAuthApi = pathname === '/api/auth/login' || pathname === '/api/auth/logout';
