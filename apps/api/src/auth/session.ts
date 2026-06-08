@@ -25,7 +25,7 @@ function base64Url(input: string | Buffer) {
 }
 
 function getSecret() {
-  return process.env.AUTH_SECRET || process.env.DASHBOARD_PASSWORD || 'dev-session-secret';
+  return process.env.AUTH_SECRET || 'dev-session-secret';
 }
 
 function sign(payload: string) {
@@ -43,7 +43,7 @@ function parseCookies(cookieHeader?: string) {
 }
 
 export function authConfigured() {
-  return isAuthConfiguredViaDb() || Boolean(process.env.DASHBOARD_USERNAME && process.env.DASHBOARD_PASSWORD);
+  return true;
 }
 
 export function createSessionToken(user: AuthUser) {

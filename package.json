@@ -18,5 +18,14 @@
   "packageManager": "pnpm@9.15.0",
   "dependencies": {
     "better-sqlite3": "^12.10.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "msgpackr-extract",
+      "sqlite3",
+      "better-sqlite3",
+      "sharp"
+    ]
   }
 }
