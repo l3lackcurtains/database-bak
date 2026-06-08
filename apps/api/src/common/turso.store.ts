@@ -173,6 +173,17 @@ export class TursoStore implements OnModuleInit, OnModuleDestroy {
       if (adminRs.rows[0]) {
         adminId = String((adminRs.rows[0] as any[])[0]);
       }
+
+      // If there is only 1 user (just the admin), seed one more user (operator)
+      if (userCount === 1) {
+        const now = new Date().toISOString();
+        const operatorId = crypto.randomUUID();
+        const operatorHash = await bcrypt.hash('operatorpass', 10);
+        await this.client.execute(
+          'INSERT INTO users (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+          [operatorId, 'operator', operatorHash, 'operator', now, now],
+        );
+      }
     } else {
       const username = process.env.DASHBOARD_USERNAME;
       const password = process.env.DASHBOARD_PASSWORD;
@@ -185,6 +196,14 @@ export class TursoStore implements OnModuleInit, OnModuleDestroy {
           [adminId, username, passwordHash, 'admin', now, now],
         );
         setAuthConfiguredViaDb(true);
+
+        // Seed 1 more user (Operator) along with admin
+        const operatorId = crypto.randomUUID();
+        const operatorHash = await bcrypt.hash('operatorpass', 10);
+        await this.client.execute(
+          'INSERT INTO users (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+          [operatorId, 'operator', operatorHash, 'operator', now, now],
+        );
       }
     }
 
