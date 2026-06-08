@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { databasesApi, jobsApi, snapshotsApi } from '@/lib/api-routes';
+import { useAuthStore } from '@/stores/authStore';
 import type { BackupJob, Database, Snapshot } from '@/types';
 import { formatBytes, formatDate } from '@/lib/utils';
 import { Play, RefreshCw, Trash2, Download, RotateCcw } from 'lucide-react';
@@ -15,6 +16,8 @@ import { Play, RefreshCw, Trash2, Download, RotateCcw } from 'lucide-react';
 const PAGE_SIZE = 20;
 
 export function SnapshotsPage() {
+  const { user } = useAuthStore();
+  const isViewer = user?.role === 'viewer';
   const router = useRouter();
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [jobs, setJobs] = useState<BackupJob[]>([]);
@@ -183,9 +186,11 @@ export function SnapshotsPage() {
           <Button variant="outline" onClick={fetchSnapshots}>
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
-          <Button onClick={() => router.push('/jobs/manual')}>
-            <Play className="h-4 w-4" /> Manual Backup
-          </Button>
+          {!isViewer && (
+            <Button onClick={() => router.push('/jobs/manual')}>
+              <Play className="h-4 w-4" /> Manual Backup
+            </Button>
+          )}
         </div>
       </div>
 
@@ -208,9 +213,11 @@ export function SnapshotsPage() {
                   <Button variant="outline" size="sm" disabled={selectedIds.size === 0 || bulkWorking} onClick={handleBulkDownload}>
                     <Download className="h-4 w-4" /> Download selected
                   </Button>
-                  <Button variant="destructive" size="sm" disabled={selectedIds.size === 0 || bulkWorking} onClick={handleBulkDelete}>
-                    <Trash2 className="h-4 w-4" /> Delete selected
-                  </Button>
+                  {!isViewer && (
+                    <Button variant="destructive" size="sm" disabled={selectedIds.size === 0 || bulkWorking} onClick={handleBulkDelete}>
+                      <Trash2 className="h-4 w-4" /> Delete selected
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" disabled={selectedIds.size === 0 || bulkWorking} onClick={() => setSelectedIds(new Set())}>
                     Clear
                   </Button>
@@ -265,18 +272,22 @@ export function SnapshotsPage() {
                           <Button variant="ghost" size="sm" onClick={() => handleDownload(s.id)} title="Download">
                             <Download className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={s.status !== 'completed'}
-                            onClick={() => router.push(`/snapshots/${s.id}/restore`)}
-                            title="Restore"
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)} title="Delete">
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          {!isViewer && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={s.status !== 'completed'}
+                                onClick={() => router.push(`/snapshots/${s.id}/restore`)}
+                                title="Restore"
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)} title="Delete">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

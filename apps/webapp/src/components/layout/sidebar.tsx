@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { useSidebarStore } from '@/stores/sidebarStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { BrandLogo } from '@/components/brand/logo';
+import { useAuthStore } from '@/stores/authStore';
 import {
   LayoutDashboard,
   Database,
@@ -21,7 +22,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { authApi } from '@/lib/api-routes';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
@@ -36,17 +36,14 @@ export function Sidebar() {
   const { collapsed, toggle } = useSidebarStore();
   const { resolvedTheme, toggleTheme } = useThemeStore();
   const pathname = usePathname();
-  const [user, setUser] = useState<{ username: string; role: string } | null>(null);
+  const { user, fetchUser, logout } = useAuthStore();
 
   useEffect(() => {
-    authApi.me()
-      .then((res) => setUser(res.user))
-      .catch(() => setUser(null));
-  }, []);
+    fetchUser();
+  }, [fetchUser]);
 
   const handleLogout = async () => {
-    await authApi.logout().catch(() => undefined);
-    window.location.href = '/login';
+    await logout();
   };
 
   return (

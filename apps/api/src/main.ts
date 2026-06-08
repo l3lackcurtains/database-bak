@@ -11,9 +11,21 @@ function sessionAuth(req: Request, res: Response, next: NextFunction) {
     return;
   }
 
-  if (!getUserFromRequest(req)) {
+  const user = getUserFromRequest(req);
+  if (!user) {
     res.status(401).json({ message: 'Authentication required', statusCode: 401, error: 'Unauthorized' });
     return;
+  }
+
+  // Enforce roles:
+  // If the user's role is 'viewer', they can only make 'GET' requests.
+  // Exception: 'POST /auth/logout', 'POST /auth/change-password'.
+  if (user.role === 'viewer' && req.method !== 'GET') {
+    const isSelfServiceAuth = path === '/auth/logout' || path === '/auth/change-password';
+    if (!isSelfServiceAuth) {
+      res.status(403).json({ message: 'Forbidden resource: Viewers have read-only access', statusCode: 403, error: 'Forbidden' });
+      return;
+    }
   }
 
   next();

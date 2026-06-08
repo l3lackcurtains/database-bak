@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useThemeStore } from '@/stores/themeStore';
+import { useAuthStore } from '@/stores/authStore';
 import { authApi, usersApi, type UserInfo } from '@/lib/api-routes';
 import { Lock, Plus, Trash2, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
@@ -70,6 +71,8 @@ function UserForm({ onDone }: { onDone: () => void }) {
 }
 
 export function SettingsPage() {
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
   const { theme, setTheme } = useThemeStore();
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,7 +108,11 @@ export function SettingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => {
+    if (isAdmin) {
+      fetchUsers();
+    }
+  }, [fetchUsers, isAdmin]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this user?')) return;
@@ -143,56 +150,58 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Users</CardTitle>
-          <Button size="sm" onClick={() => setShowForm(!showForm)}>
-            <Plus className="h-4 w-4" /> Add User
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {showForm && <UserForm onDone={() => { setShowForm(false); fetchUsers(); }} />}
+      {isAdmin && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Users</CardTitle>
+            <Button size="sm" onClick={() => setShowForm(!showForm)}>
+              <Plus className="h-4 w-4" /> Add User
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {showForm && <UserForm onDone={() => { setShowForm(false); fetchUsers(); }} />}
 
-          {loading ? (
-            <div className="flex justify-center py-4"><Spinner size="sm" /></div>
-          ) : users.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">No users yet.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="flex items-center gap-2 font-medium">
-                      <UserIcon className="h-4 w-4 text-muted-foreground" />
-                      {u.username}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={u.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
-                        <ShieldCheck className="h-3 w-3 mr-1" />
-                        {u.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{formatDate(u.createdAt)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(u.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
+            {loading ? (
+              <div className="flex justify-center py-4"><Spinner size="sm" /></div>
+            ) : users.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No users yet.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {users.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell className="flex items-center gap-2 font-medium">
+                        <UserIcon className="h-4 w-4 text-muted-foreground" />
+                        {u.username}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={u.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
+                          <ShieldCheck className="h-3 w-3 mr-1" />
+                          {u.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{formatDate(u.createdAt)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(u.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader><CardTitle>Change Password</CardTitle></CardHeader>

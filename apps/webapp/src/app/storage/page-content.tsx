@@ -8,12 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { storageApi } from '@/lib/api-routes';
+import { useAuthStore } from '@/stores/authStore';
 import { ApiError } from '@/lib/api';
 import type { StorageConfig } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { Plus, Trash2, RefreshCw, Star, Edit3, Lock } from 'lucide-react';
 
 export function StoragePage() {
+  const { user } = useAuthStore();
+  const isViewer = user?.role === 'viewer';
   const router = useRouter();
   const [storageConfigs, setStorageConfigs] = useState<StorageConfig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,9 +79,11 @@ export function StoragePage() {
           <Button variant="outline" onClick={fetchStorage}>
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
-          <Button onClick={() => { setEditingStorage(null); setShowForm(!showForm); }}>
-            <Plus className="h-4 w-4" /> Add Storage
-          </Button>
+          {!isViewer && (
+            <Button onClick={() => { setEditingStorage(null); setShowForm(!showForm); }}>
+              <Plus className="h-4 w-4" /> Add Storage
+            </Button>
+          )}
         </div>
       </div>
 
@@ -110,7 +115,7 @@ export function StoragePage() {
                 <TableRow>
                   <TableHead className="w-[220px]">Configuration</TableHead>
                   <TableHead className="w-[360px]">Storage</TableHead>
-                  <TableHead className="w-[210px] text-right">Actions</TableHead>
+                  {!isViewer && <TableHead className="w-[210px] text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -129,32 +134,34 @@ export function StoragePage() {
                         <div className="flex flex-wrap items-center gap-2 pt-1">
                           {s.isDefault ? (
                             <Badge variant="success"><Star className="h-3 w-3 mr-1" /> Default</Badge>
-                          ) : (
+                          ) : !isViewer ? (
                             <Button variant="ghost" size="sm" className="h-6 px-0" onClick={() => handleSetDefault(s.id)}>
                               Set Default
                             </Button>
-                          )}
+                          ) : null}
                           <span className="text-xs text-muted-foreground">{formatDate(s.createdAt)}</span>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setShowForm(false);
-                            setEditingStorage(s);
-                          }}
-                        >
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {!isViewer && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setShowForm(false);
+                              setEditingStorage(s);
+                            }}
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

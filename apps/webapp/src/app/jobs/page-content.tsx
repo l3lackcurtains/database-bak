@@ -11,10 +11,13 @@ import type { BackupJob, JobDatabaseDetails } from '@/types';
 import { formatDate, formatDuration, formatRelative } from '@/lib/utils';
 import { ArrowRight, CalendarClock, Clock, Database, Edit3, HardDrive, Pause, Play, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { useAuthStore } from '@/stores/authStore';
 
 type JobsTab = 'scheduled' | 'manual';
 
 export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab }) {
+  const { user } = useAuthStore();
+  const isViewer = user?.role === 'viewer';
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -158,12 +161,16 @@ export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab })
           <Button variant="outline" onClick={fetchJobs}>
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
-          <Link href="/jobs/manual">
-            <Button><Play className="h-4 w-4" /> Manual Backup</Button>
-          </Link>
-          <Link href="/jobs/new">
-            <Button variant="outline"><Plus className="h-4 w-4" /> Scheduled Job</Button>
-          </Link>
+          {!isViewer && (
+            <>
+              <Link href="/jobs/manual">
+                <Button><Play className="h-4 w-4" /> Manual Backup</Button>
+              </Link>
+              <Link href="/jobs/new">
+                <Button variant="outline"><Plus className="h-4 w-4" /> Scheduled Job</Button>
+              </Link>
+            </>
+          )}
         </div>
       </div>
 
@@ -291,31 +298,35 @@ export function JobsPage({ initialTab = 'scheduled' }: { initialTab?: JobsTab })
                         <Link href={`/jobs/${job.id}`}>
                           <Button variant="outline" size="sm">Details</Button>
                         </Link>
-                        {job.status === 'running' && (
-                          <Button variant="ghost" size="icon" onClick={() => handleCancel(job.id)} title="Cancel">
-                            <Pause className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {job.status !== 'running' && (
-                          <Button variant="ghost" size="icon" onClick={() => handleRunNow(job.id)} title="Run now">
-                            <Play className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {job.status === 'failed' && (
-                          <Button variant="ghost" size="icon" onClick={() => handleRetry(job.id)} title="Retry">
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {job.status !== 'running' && job.schedule && (
-                          <Link href={`/jobs/${job.id}/edit`}>
-                            <Button variant="ghost" size="icon" title="Edit">
-                              <Edit3 className="h-4 w-4" />
+                        {!isViewer && (
+                          <>
+                            {job.status === 'running' && (
+                              <Button variant="ghost" size="icon" onClick={() => handleCancel(job.id)} title="Cancel">
+                                <Pause className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {job.status !== 'running' && (
+                              <Button variant="ghost" size="icon" onClick={() => handleRunNow(job.id)} title="Run now">
+                                <Play className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {job.status === 'failed' && (
+                              <Button variant="ghost" size="icon" onClick={() => handleRetry(job.id)} title="Retry">
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {job.status !== 'running' && job.schedule && (
+                              <Link href={`/jobs/${job.id}/edit`}>
+                                <Button variant="ghost" size="icon" title="Edit">
+                                  <Edit3 className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            )}
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(job.id)} title="Delete">
+                              <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
-                          </Link>
+                          </>
                         )}
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(job.id)} title="Delete">
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
                       </div>
                     </div>
                   </div>

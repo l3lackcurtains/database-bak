@@ -8,11 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { databasesApi } from '@/lib/api-routes';
+import { useAuthStore } from '@/stores/authStore';
 import { ApiError } from '@/lib/api';
 import type { Database } from '@/types';
 import { Copy, Plus, Trash2, RefreshCw, Link2, Edit3, Lock } from 'lucide-react';
 
 export function DatabasesPage() {
+  const { user } = useAuthStore();
+  const isViewer = user?.role === 'viewer';
   const router = useRouter();
   const [databases, setDatabases] = useState<Database[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,9 +66,11 @@ export function DatabasesPage() {
           <Button variant="outline" onClick={fetchDatabases}>
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
-          <Button onClick={() => { setEditingDatabase(null); setCloningDatabase(null); setShowForm(!showForm); }}>
-            <Plus className="h-4 w-4" /> Add Database
-          </Button>
+          {!isViewer && (
+            <Button onClick={() => { setEditingDatabase(null); setCloningDatabase(null); setShowForm(!showForm); }}>
+              <Plus className="h-4 w-4" /> Add Database
+            </Button>
+          )}
         </div>
       </div>
 
@@ -103,7 +108,7 @@ export function DatabasesPage() {
                 <TableRow>
                   <TableHead className="w-[220px]">Connection</TableHead>
                   <TableHead className="w-[320px]">Target</TableHead>
-                  <TableHead className="w-[190px] text-right">Actions</TableHead>
+                  {!isViewer && <TableHead className="w-[190px] text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -121,35 +126,37 @@ export function DatabasesPage() {
                         <div className="max-w-[320px] truncate text-sm text-muted-foreground">{db.database}</div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setShowForm(false);
-                            setCloningDatabase(null);
-                            setEditingDatabase(db);
-                          }}
-                        >
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setShowForm(false);
-                            setEditingDatabase(null);
-                            setCloningDatabase(db);
-                          }}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(db.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {!isViewer && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setShowForm(false);
+                              setCloningDatabase(null);
+                              setEditingDatabase(db);
+                            }}
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setShowForm(false);
+                              setEditingDatabase(null);
+                              setCloningDatabase(db);
+                            }}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(db.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

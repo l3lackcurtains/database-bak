@@ -1,12 +1,19 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useSidebarStore } from '@/stores/sidebarStore';
+import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { collapsed } = useSidebarStore();
+  const { fetchUser } = useAuthStore();
+
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
 
   return (
     <div className="flex min-h-screen bg-background">
