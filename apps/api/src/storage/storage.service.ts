@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TursoStore } from '../common/turso.store';
 import { CryptoService } from '../common/crypto.service';
+import { AuthUser } from '../auth/session';
 import {
   S3Client,
   HeadBucketCommand,
@@ -44,25 +45,37 @@ export class StorageService {
     };
   }
 
-  async findAll(): Promise<StorageEntity[]> {
+  async findAll(user?: AuthUser): Promise<StorageEntity[]> {
     const list = await this.store.getAll<StorageEntity>('storage');
-    return list.map((s) => this.decryptStorage(s));
+    const filtered = list.filter((s: any) => {
+      if (!user || user.role === 'admin') return true;
+      return s.userId === user.id || !s.userId;
+    });
+    return filtered.map((s) => this.decryptStorage(s));
   }
 
-  async findOne(id: string): Promise<StorageEntity | null> {
+  async findOne(id: string, user?: AuthUser): Promise<StorageEntity | null> {
     const s = (await this.store.getById<StorageEntity>('storage', id)) || null;
-    return s ? this.decryptStorage(s) : null;
+    if (!s) return null;
+    if (user && user.role !== 'admin' && s.userId && s.userId !== user.id) {
+      return null;
+    }
+    return this.decryptStorage(s);
   }
 
-  async getDefault(): Promise<StorageEntity | null> {
-    const found = await this.store.findBy('storage', (s: StorageEntity) => s.isDefault);
-    return found[0] || null;
+  async getDefault(user?: AuthUser): Promise<StorageEntity | null> {
+    const found = await this.store.findBy('storage', (s: any) => s.isDefault);
+    const filtered = found.filter((s: any) => {
+      if (!user || user.role === 'admin') return true;
+      return s.userId === user.id || !s.userId;
+    });
+    return filtered[0] || null;
   }
 
-  async create(dto: CreateStorageDto): Promise<StorageEntity> {
+  async create(dto: CreateStorageDto, user?: AuthUser): Promise<StorageEntity> {
     const count = await this.store.count('storage');
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
-    const entity: StorageEntity = {
+    const entity: StorageEntity & { userId?: string | null } = {
       id,
       name: dto.name,
       label: dto.label,
@@ -77,6 +90,7 @@ export class StorageService {
       status: 'disconnected',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      userId: user?.id || null,
     };
     return this.store.create('storage', this.encryptStorage(entity) as StorageEntity);
   }
@@ -84,14 +98,19 @@ export class StorageService {
   async update(
     id: string,
     dto: UpdateStorageDto,
+    user?: AuthUser,
   ): Promise<StorageEntity | null> {
-    const existing = await this.findOne(id);
+    const existing = await this.findOne(id, user);
     if (!existing) return null;
     const merged = { ...existing, ...dto, id, updatedAt: new Date().toISOString() };
     return this.store.create('storage', this.encryptStorage(merged) as StorageEntity);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, user?: AuthUser): Promise<void> {
+    const existing = await this.findOne(id, user);
+    if (!existing) {
+      throw new BadRequestException('Storage config not found or unauthorized');
+    }
     const jobs = await this.store.findBy('jobs', (job: { storageId?: string }) => job.storageId === id);
     if (jobs.length > 0) {
       throw new BadRequestException('Cannot delete storage while jobs reference it');
@@ -99,7 +118,11 @@ export class StorageService {
     await this.store.delete('storage', id);
   }
 
-  async setDefault(id: string): Promise<StorageEntity | null> {
+  async setDefault(id: string, user?: AuthUser): Promise<StorageEntity | null> {
+    const existing = await this.findOne(id, user);
+    if (!existing) {
+      throw new BadRequestException('Storage config not found or unauthorized');
+    }
     const all = await this.store.getAll<StorageEntity>('storage');
     for (const s of all) {
       if (s.isDefault) {

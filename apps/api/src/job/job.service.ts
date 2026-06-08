@@ -11,6 +11,7 @@ import { DatabaseService } from '../database/database.service';
 import { StorageService } from '../storage/storage.service';
 import { SnapshotService } from '../snapshot/snapshot.service';
 import { BackupEngine } from '../backup-engine/backup.engine';
+import { AuthUser } from '../auth/session';
 
 @Injectable()
 export class JobService {
@@ -32,9 +33,16 @@ export class JobService {
     type?: string,
     source?: string,
     databaseId?: string,
+    user?: AuthUser,
   ) {
     await this.ensureScheduledJobsHaveNextRun();
     let jobs = await this.store.getAll<JobEntity>('jobs');
+    
+    // Filter by user ownership (if they are not admin and user is provided)
+    if (user && user.role !== 'admin') {
+      jobs = jobs.filter((j: any) => j.userId === user.id || !j.userId);
+    }
+
     if (status) jobs = jobs.filter((j) => j.status === status);
     if (type) jobs = jobs.filter((j) => j.type === type);
     if (source === 'manual') {
@@ -50,10 +58,14 @@ export class JobService {
     return { data, total, page, limit, totalPages };
   }
 
-  async findOne(id: string): Promise<JobEntity | null> {
+  async findOne(id: string, user?: AuthUser): Promise<JobEntity | null> {
     await this.ensureScheduledJobsHaveNextRun();
     const job = (await this.store.getById<JobEntity>('jobs', id)) || null;
-    return job ? (await this.withDetails(job)) : null;
+    if (!job) return null;
+    if (user && user.role !== 'admin' && job.userId && job.userId !== user.id) {
+      return null;
+    }
+    return await this.withDetails(job);
   }
 
   private async databaseSummary(id?: string | null) {
@@ -230,12 +242,12 @@ export class JobService {
     return this.scheduleWithNextRun(schedule);
   }
 
-  async create(dto: CreateJobDto): Promise<JobEntity> {
-    const db = await this.databaseService.findOne(dto.databaseId);
-    if (!db) throw new Error('Database not found');
+  async create(dto: CreateJobDto, user?: AuthUser): Promise<JobEntity> {
+    const db = await this.databaseService.findOne(dto.databaseId, user);
+    if (!db) throw new Error('Database not found or unauthorized');
 
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
-    const entity: JobEntity = {
+    const entity: JobEntity & { userId?: string | null } = {
       id,
       name: dto.name,
       databaseId: dto.databaseId,
@@ -262,6 +274,7 @@ export class JobService {
       completedAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      userId: user?.id || null,
     };
 
     const job = await this.store.create('jobs', entity);
@@ -273,20 +286,20 @@ export class JobService {
     return job;
   }
 
-  async update(id: string, dto: UpdateJobDto): Promise<JobEntity | null> {
-    const existing = await this.findOne(id);
+  async update(id: string, dto: UpdateJobDto, user?: AuthUser): Promise<JobEntity | null> {
+    const existing = await this.findOne(id, user);
     if (!existing || existing.status === 'running') return null;
 
     let databaseName = existing.databaseName;
     if (dto.databaseId && dto.databaseId !== existing.databaseId) {
-      const db = await this.databaseService.findOne(dto.databaseId);
-      if (!db) throw new BadRequestException('Database not found');
+      const db = await this.databaseService.findOne(dto.databaseId, user);
+      if (!db) throw new BadRequestException('Database not found or unauthorized');
       databaseName = db.label || db.name;
     }
 
     if (dto.storageId && dto.storageId !== existing.storageId) {
-      const storage = await this.storageService.findOne(dto.storageId);
-      if (!storage) throw new BadRequestException('Storage not found');
+      const storage = await this.storageService.findOne(dto.storageId, user);
+      if (!storage) throw new BadRequestException('Storage not found or unauthorized');
     }
 
     return this.store.update<JobEntity>('jobs', id, {
@@ -318,8 +331,8 @@ export class JobService {
     });
   }
 
-  async cancel(id: string): Promise<JobEntity | null> {
-    const job = await this.findOne(id);
+  async cancel(id: string, user?: AuthUser): Promise<JobEntity | null> {
+    const job = await this.findOne(id, user);
     if (!job || job.status !== 'running') return null;
     return this.store.update<JobEntity>('jobs', id, {
       status: 'cancelled',
@@ -329,8 +342,8 @@ export class JobService {
     });
   }
 
-  async retry(id: string): Promise<JobEntity | null> {
-    const job = await this.findOne(id);
+  async retry(id: string, user?: AuthUser): Promise<JobEntity | null> {
+    const job = await this.findOne(id, user);
     if (!job || job.status !== 'failed') return null;
     await this.store.update<JobEntity>('jobs', id, {
       status: 'pending',
@@ -342,11 +355,11 @@ export class JobService {
       updatedAt: new Date().toISOString(),
     });
     await this.jobQueue.add('execute', { jobId: id });
-    return this.findOne(id);
+    return this.findOne(id, user);
   }
 
-  async runNow(id: string): Promise<JobEntity | null> {
-    const job = await this.findOne(id);
+  async runNow(id: string, user?: AuthUser): Promise<JobEntity | null> {
+    const job = await this.findOne(id, user);
     if (!job || job.status === 'running') return null;
 
     await this.store.update<JobEntity>('jobs', id, {
@@ -359,10 +372,14 @@ export class JobService {
       updatedAt: new Date().toISOString(),
     });
     await this.jobQueue.add('execute', { jobId: id });
-    return this.findOne(id);
+    return this.findOne(id, user);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, user?: AuthUser): Promise<void> {
+    const job = await this.findOne(id, user);
+    if (!job) {
+      throw new BadRequestException('Job not found or unauthorized');
+    }
     await this.store.delete('jobs', id);
   }
 

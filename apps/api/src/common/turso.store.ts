@@ -9,14 +9,16 @@ const SCHEMAS = [
     id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL,
     host TEXT NOT NULL, port INTEGER NOT NULL, database TEXT NOT NULL,
     username TEXT NOT NULL DEFAULT '', password TEXT NOT NULL DEFAULT '',
-    ssl INTEGER NOT NULL DEFAULT 0, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL, url TEXT
+    ssl INTEGER NOT NULL DEFAULT 0, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL, url TEXT,
+    userId TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS storage (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, provider TEXT NOT NULL,
     endpoint TEXT NOT NULL, region TEXT NOT NULL DEFAULT 'us-east-1',
     bucket TEXT NOT NULL, accessKeyId TEXT NOT NULL, secretAccessKey TEXT NOT NULL,
     pathPrefix TEXT NOT NULL DEFAULT 'backups/', isDefault INTEGER NOT NULL DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'disconnected', createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
+    status TEXT NOT NULL DEFAULT 'disconnected', createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL,
+    userId TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS snapshots (
     id TEXT PRIMARY KEY, databaseId TEXT NOT NULL, databaseName TEXT NOT NULL,
@@ -25,7 +27,8 @@ const SCHEMAS = [
     storageKey TEXT NOT NULL DEFAULT '', size INTEGER NOT NULL DEFAULT 0,
     compressedSize INTEGER NOT NULL DEFAULT 0, checksum TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'pending', startedAt TEXT NOT NULL,
-    completedAt TEXT, error TEXT, metadata TEXT, createdAt TEXT NOT NULL
+    completedAt TEXT, error TEXT, metadata TEXT, createdAt TEXT NOT NULL,
+    userId TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL,
@@ -40,13 +43,18 @@ const SCHEMAS = [
     failedRunCount INTEGER NOT NULL DEFAULT 0, progress INTEGER NOT NULL DEFAULT 0,
     currentStep TEXT NOT NULL DEFAULT '', snapshotId TEXT, error TEXT,
     startedAt TEXT, completedAt TEXT, createdAt TEXT NOT NULL,
-    updatedAt TEXT NOT NULL, details TEXT
+    updatedAt TEXT NOT NULL, details TEXT,
+    userId TEXT
   )`,
 ];
 
 const MIGRATIONS = [
   'ALTER TABLE databases ADD COLUMN label TEXT DEFAULT NULL',
   'ALTER TABLE storage ADD COLUMN label TEXT DEFAULT NULL',
+  'ALTER TABLE databases ADD COLUMN userId TEXT DEFAULT NULL',
+  'ALTER TABLE storage ADD COLUMN userId TEXT DEFAULT NULL',
+  'ALTER TABLE jobs ADD COLUMN userId TEXT DEFAULT NULL',
+  'ALTER TABLE snapshots ADD COLUMN userId TEXT DEFAULT NULL',
 ];
 
 const TABLE = { databases: 'databases', storage: 'storage', snapshots: 'snapshots', jobs: 'jobs', users: 'users' } as const;

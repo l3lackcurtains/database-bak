@@ -7,11 +7,14 @@ import {
   Query,
   NotFoundException,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Readable } from 'stream';
 import { SnapshotService } from './snapshot.service';
 import { StorageService } from '../storage/storage.service';
+import type { Request } from 'express';
+import { getUserFromRequest } from '../auth/session';
 
 @Controller('snapshots')
 export class SnapshotController {
@@ -25,37 +28,44 @@ export class SnapshotController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
     @Query('databaseId') databaseId?: string,
+    @Req() req: Request,
   ) {
+    const user = getUserFromRequest(req)!;
     return this.snapshotService.findAll(
       parseInt(page),
       parseInt(limit),
       databaseId,
+      user,
     );
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.snapshotService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: Request) {
+    const user = getUserFromRequest(req)!;
+    return this.snapshotService.findOne(id, user);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    const snapshot = await this.snapshotService.findOne(id);
+  async remove(@Param('id') id: string, @Req() req: Request) {
+    const user = getUserFromRequest(req)!;
+    const snapshot = await this.snapshotService.findOne(id, user);
+    if (!snapshot) throw new NotFoundException('Snapshot not found or unauthorized');
     if (snapshot && snapshot.storageKey) {
-      const storage = await this.storageService.findOne(snapshot.storageId);
+      const storage = await this.storageService.findOne(snapshot.storageId, user);
       if (storage) {
         await this.storageService.deleteFile(storage, snapshot.storageKey);
       }
     }
-    await this.snapshotService.remove(id);
+    await this.snapshotService.remove(id, user);
     return { success: true };
   }
 
   @Get(':id/download')
-  async getDownloadUrl(@Param('id') id: string) {
-    const snapshot = await this.snapshotService.findOne(id);
+  async getDownloadUrl(@Param('id') id: string, @Req() req: Request) {
+    const user = getUserFromRequest(req)!;
+    const snapshot = await this.snapshotService.findOne(id, user);
     if (!snapshot) throw new NotFoundException('Snapshot not found');
-    const storage = await this.storageService.findOne(snapshot.storageId);
+    const storage = await this.storageService.findOne(snapshot.storageId, user);
     if (!storage) throw new NotFoundException('Storage not found');
     return this.storageService.generateDownloadUrl(
       storage,
@@ -69,14 +79,15 @@ export class SnapshotController {
   }
 
   @Post(':id/verify')
-  async verify(@Param('id') id: string) {
-    const snapshot = await this.snapshotService.findOne(id);
+  async verify(@Param('id') id: string, @Req() req: Request) {
+    const user = getUserFromRequest(req)!;
+    const snapshot = await this.snapshotService.findOne(id, user);
     if (!snapshot) throw new NotFoundException('Snapshot not found');
     if (!snapshot.storageKey) {
       throw new BadRequestException('Snapshot has no storage key');
     }
 
-    const storage = await this.storageService.findOne(snapshot.storageId);
+    const storage = await this.storageService.findOne(snapshot.storageId, user);
     if (!storage) throw new NotFoundException('Storage not found');
 
     const stream = await this.storageService.downloadFileStream(

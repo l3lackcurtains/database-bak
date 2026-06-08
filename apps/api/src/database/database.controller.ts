@@ -6,37 +6,45 @@ import {
   Delete,
   Body,
   Param,
+  Req,
 } from '@nestjs/common';
 import { DatabaseService } from './database.service';
 import { CreateDatabaseDto, UpdateDatabaseDto } from './database.types';
+import type { Request } from 'express';
+import { getUserFromRequest } from '../auth/session';
 
 @Controller('databases')
 export class DatabaseController {
   constructor(private service: DatabaseService) {}
 
   @Get()
-  findAll() {
-    return this.service.findAll();
+  findAll(@Req() req: Request) {
+    const user = getUserFromRequest(req)!;
+    return this.service.findAll(user);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: Request) {
+    const user = getUserFromRequest(req)!;
+    return this.service.findOne(id, user);
   }
 
   @Post()
-  create(@Body() dto: CreateDatabaseDto) {
-    return this.service.create(dto);
+  create(@Body() dto: CreateDatabaseDto, @Req() req: Request) {
+    const user = getUserFromRequest(req)!;
+    return this.service.create(dto, user);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateDatabaseDto) {
-    return this.service.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateDatabaseDto, @Req() req: Request) {
+    const user = getUserFromRequest(req)!;
+    return this.service.update(id, dto, user);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    await this.service.remove(id);
+  async remove(@Param('id') id: string, @Req() req: Request) {
+    const user = getUserFromRequest(req)!;
+    await this.service.remove(id, user);
     return { success: true };
   }
 

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { TursoStore } from '../common/turso.store';
 import { CryptoService } from '../common/crypto.service';
 import { DatabaseEntity } from '../entities/database.entity';
+import { AuthUser } from '../auth/session';
 import {
   CreateDatabaseDto,
   UpdateDatabaseDto,
@@ -31,18 +32,26 @@ export class DatabaseService {
     };
   }
 
-  async findAll(): Promise<DatabaseEntity[]> {
+  async findAll(user?: AuthUser): Promise<DatabaseEntity[]> {
     const dbs = await this.store.getAll<DatabaseEntity>('databases');
-    return dbs.map((db) => this.decryptDb(db));
+    const filtered = dbs.filter((db: any) => {
+      if (!user || user.role === 'admin') return true;
+      return db.userId === user.id || !db.userId;
+    });
+    return filtered.map((db) => this.decryptDb(db));
   }
 
-  async findOne(id: string): Promise<DatabaseEntity | null> {
+  async findOne(id: string, user?: AuthUser): Promise<DatabaseEntity | null> {
     const db = (await this.store.getById<DatabaseEntity>('databases', id)) || null;
-    return db ? this.decryptDb(db) : null;
+    if (!db) return null;
+    if (user && user.role !== 'admin' && db.userId && db.userId !== user.id) {
+      return null;
+    }
+    return this.decryptDb(db);
   }
 
-  async create(dto: CreateDatabaseDto): Promise<DatabaseEntity> {
-    let data: Partial<DatabaseEntity>;
+  async create(dto: CreateDatabaseDto, user?: AuthUser): Promise<DatabaseEntity> {
+    let data: Partial<DatabaseEntity & { userId?: string | null }>;
 
     if (dto.url) {
       const parsed = parseDatabaseUrl(dto.url);
@@ -61,6 +70,7 @@ export class DatabaseService {
         ssl: dto.ssl ?? parsed.ssl ?? false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        userId: user?.id || null,
       };
     } else {
       data = {
@@ -77,6 +87,7 @@ export class DatabaseService {
         ssl: dto.ssl ?? false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        userId: user?.id || null,
       };
     }
 
@@ -88,14 +99,19 @@ export class DatabaseService {
   async update(
     id: string,
     dto: UpdateDatabaseDto,
+    user?: AuthUser,
   ): Promise<DatabaseEntity | null> {
-    const existing = await this.findOne(id);
+    const existing = await this.findOne(id, user);
     if (!existing) return null;
     const merged = { ...existing, ...dto, id, updatedAt: new Date().toISOString() };
     return this.store.create('databases', this.encryptDb(merged) as DatabaseEntity);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, user?: AuthUser): Promise<void> {
+    const existing = await this.findOne(id, user);
+    if (!existing) {
+      throw new BadRequestException('Database not found or unauthorized');
+    }
     const jobs = await this.store.findBy('jobs', (job: { databaseId?: string }) => job.databaseId === id);
     if (jobs.length > 0) {
       throw new BadRequestException('Cannot delete database while jobs reference it');
