@@ -6,8 +6,8 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "format": "prettier --write '**/*.{ts,tsx,md}'",
-    "kill-ports": "fuser -k 3000/tcp 7100/tcp 2>/dev/null; true",
-    "reset": "fuser -k 3000/tcp 7100/tcp 2>/dev/null; true && turbo dev"
+    "kill-ports": "fuser -k 7301/tcp 7300/tcp 2>/dev/null; true",
+    "reset": "fuser -k 7301/tcp 7300/tcp 2>/dev/null; true && turbo dev"
   },
   "devDependencies": {
     "prettier": "^3.2.5",

@@ -24,11 +24,13 @@ async function bootstrap() {
 
   app.enableCors({
     origin: [
-      'http://localhost:7100',
-      'http://127.0.0.1:7100',
-      'http://localhost:7101',
-      'http://127.0.0.1:7101',
-      'http://192.168.0.84:7100',
+      'http://localhost:7300',
+      'http://127.0.0.1:7300',
+      'http://localhost:7301',
+      'http://127.0.0.1:7301',
+      'http://localhost:7302',
+      'http://127.0.0.1:7302',
+      'http://192.168.0.84:7300',
     ],
     credentials: true,
   });
@@ -36,7 +38,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.use(sessionAuth);
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 7301;
   await app.listen(port);
   console.log(`API running on http://localhost:${port}/api`);
 }

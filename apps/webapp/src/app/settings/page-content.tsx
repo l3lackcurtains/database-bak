@@ -230,7 +230,7 @@ export function SettingsPage() {
             <div>
               <label className="text-sm font-medium">API URL</label>
               <p className="text-sm text-muted-foreground mt-1">
-                {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}
+                {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7301/api'}
               </p>
             </div>
           </div>

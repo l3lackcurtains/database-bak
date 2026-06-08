@@ -12,11 +12,11 @@ services:
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "7301:7301"
     volumes:
       - ./data:/data
     environment:
-      - PORT=3000
+      - PORT=7301
       - NODE_ENV=production
       - DATABASE_MODE=${DATABASE_MODE:-turso}
       - SQLITE_PATH=/data/database-bak.sqlite
@@ -38,10 +38,10 @@ services:
       dockerfile: apps/webapp/Dockerfile
     restart: unless-stopped
     ports:
-      - "7100:7100"
+      - "7300:7300"
     environment:
-      - PORT=7100
-      - API_URL=http://server:3000
+      - PORT=7300
+      - API_URL=http://server:7301
       - DASHBOARD_USERNAME=${DASHBOARD_USERNAME:-admin}
       - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-changeme}
       - AUTH_SECRET=${AUTH_SECRET}
