@@ -28,9 +28,9 @@ export class DashboardController {
     let databases = await this.store.getAll<any>('databases');
 
     if (user && user.role !== 'admin') {
-      jobs = jobs.filter((j: any) => j.userId === user.id || !j.userId);
-      snapshots = snapshots.filter((s: any) => s.userId === user.id || !s.userId);
-      databases = databases.filter((db: any) => db.userId === user.id || !db.userId);
+      jobs = jobs.filter((j: any) => j.userId === user.id);
+      snapshots = snapshots.filter((s: any) => s.userId === user.id);
+      databases = databases.filter((db: any) => db.userId === user.id);
     }
 
     const now = new Date();

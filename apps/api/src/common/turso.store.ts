@@ -181,6 +181,20 @@ export class TursoStore implements OnModuleInit, OnModuleDestroy {
       console.log('🌱 Automatically seeded default admin and operator users.');
     }
 
+    // Migrate any null or empty string userId records to Admin
+    const adminUserRs = await this.client.execute("SELECT id FROM users WHERE username = 'admin' LIMIT 1");
+    if (adminUserRs.rows.length > 0) {
+      const adminId = String((adminUserRs.rows[0] as any[])[0]);
+      for (const table of ['databases', 'storage', 'jobs', 'snapshots']) {
+        try {
+          await this.client.execute(`UPDATE ${table} SET userId = ? WHERE userId IS NULL OR userId = ''`, [adminId]);
+        } catch (e) {
+          console.error(`[Self-Healing] Failed to migrate legacy records for table ${table}:`, e);
+        }
+      }
+      console.log('🌱 [Self-Healing] Automatically migrated legacy/orphan records to Admin user.');
+    }
+
     setAuthConfiguredViaDb(true);
   }
 

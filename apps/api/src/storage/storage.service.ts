@@ -49,7 +49,7 @@ export class StorageService {
     const list = await this.store.getAll<StorageEntity>('storage');
     const filtered = list.filter((s: any) => {
       if (!user || user.role === 'admin') return true;
-      return s.userId === user.id || !s.userId;
+      return s.userId === user.id;
     });
     return filtered.map((s) => this.decryptStorage(s));
   }
@@ -57,7 +57,7 @@ export class StorageService {
   async findOne(id: string, user?: AuthUser): Promise<StorageEntity | null> {
     const s = (await this.store.getById<StorageEntity>('storage', id)) || null;
     if (!s) return null;
-    if (user && user.role !== 'admin' && s.userId && s.userId !== user.id) {
+    if (user && user.role !== 'admin' && s.userId !== user.id) {
       return null;
     }
     return this.decryptStorage(s);
@@ -67,7 +67,7 @@ export class StorageService {
     const found = await this.store.findBy('storage', (s: any) => s.isDefault);
     const filtered = found.filter((s: any) => {
       if (!user || user.role === 'admin') return true;
-      return s.userId === user.id || !s.userId;
+      return s.userId === user.id;
     });
     return filtered[0] || null;
   }

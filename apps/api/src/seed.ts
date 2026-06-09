@@ -45,12 +45,12 @@ async function bootstrap() {
     console.log('✅ Operator user "operator" seeded successfully with password "operatorpass".');
   }
 
-  // 3. Migrate any null userId records
+  // 3. Migrate any null or empty string userId records
   const adminUser = await store.findByUsername(username);
   if (adminUser) {
     for (const table of ['databases', 'storage', 'jobs', 'snapshots']) {
       try {
-        await store.client.execute(`UPDATE ${table} SET userId = ? WHERE userId IS NULL`, [adminUser.id]);
+        await store.client.execute(`UPDATE ${table} SET userId = ? WHERE userId IS NULL OR userId = ''`, [adminUser.id]);
       } catch {}
     }
     console.log('✅ Legacy records successfully migrated to Admin.');

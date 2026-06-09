@@ -40,7 +40,7 @@ export class JobService {
     
     // Filter by user ownership (if they are not admin and user is provided)
     if (user && user.role !== 'admin') {
-      jobs = jobs.filter((j: any) => j.userId === user.id || !j.userId);
+      jobs = jobs.filter((j: any) => j.userId === user.id);
     }
 
     if (status) jobs = jobs.filter((j) => j.status === status);
@@ -62,7 +62,7 @@ export class JobService {
     await this.ensureScheduledJobsHaveNextRun();
     const job = (await this.store.getById<JobEntity>('jobs', id)) || null;
     if (!job) return null;
-    if (user && user.role !== 'admin' && job.userId && job.userId !== user.id) {
+    if (user && user.role !== 'admin' && job.userId !== user.id) {
       return null;
     }
     return await this.withDetails(job);
@@ -475,7 +475,7 @@ export class JobService {
       sourceType: job?.schedule ? 'scheduled' : 'manual',
       sourceJobId: jobId,
       sourceJobName: job?.name,
-    });
+    }, job?.userId ? ({ id: job.userId } as any) : undefined);
 
     await this.store.update<JobEntity>('jobs', jobId, {
       snapshotId: snapshot.id,

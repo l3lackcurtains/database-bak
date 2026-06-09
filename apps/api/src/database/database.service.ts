@@ -36,7 +36,7 @@ export class DatabaseService {
     const dbs = await this.store.getAll<DatabaseEntity>('databases');
     const filtered = dbs.filter((db: any) => {
       if (!user || user.role === 'admin') return true;
-      return db.userId === user.id || !db.userId;
+      return db.userId === user.id;
     });
     return filtered.map((db) => this.decryptDb(db));
   }
@@ -44,7 +44,7 @@ export class DatabaseService {
   async findOne(id: string, user?: AuthUser): Promise<DatabaseEntity | null> {
     const db = (await this.store.getById<DatabaseEntity>('databases', id)) || null;
     if (!db) return null;
-    if (user && user.role !== 'admin' && db.userId && db.userId !== user.id) {
+    if (user && user.role !== 'admin' && db.userId !== user.id) {
       return null;
     }
     return this.decryptDb(db);

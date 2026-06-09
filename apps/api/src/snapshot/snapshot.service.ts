@@ -11,7 +11,7 @@ export class SnapshotService {
   async findAll(page: number = 1, limit: number = 20, databaseId?: string, user?: AuthUser) {
     let snapshots = await this.store.getAll<SnapshotEntity>('snapshots');
     if (user && user.role !== 'admin') {
-      snapshots = snapshots.filter((s: any) => s.userId === user.id || !s.userId);
+      snapshots = snapshots.filter((s: any) => s.userId === user.id);
     }
     if (databaseId) {
       snapshots = snapshots.filter((s) => s.databaseId === databaseId);
@@ -26,7 +26,7 @@ export class SnapshotService {
   async findOne(id: string, user?: AuthUser): Promise<SnapshotEntity | null> {
     const s = (await this.store.getById<SnapshotEntity>('snapshots', id)) || null;
     if (!s) return null;
-    if (user && user.role !== 'admin' && s.userId && s.userId !== user.id) {
+    if (user && user.role !== 'admin' && s.userId !== user.id) {
       return null;
     }
     return s;
@@ -81,7 +81,7 @@ export class SnapshotService {
     );
     return found.filter((s: any) => {
       if (!user || user.role === 'admin') return true;
-      return s.userId === user.id || !s.userId;
+      return s.userId === user.id;
     });
   }
 }
