@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { setAuthConfiguredViaDb } from './auth-config';
 
 
@@ -156,9 +157,31 @@ export class TursoStore implements OnModuleInit, OnModuleDestroy {
 
     const rs = await this.client.execute('SELECT COUNT(*) as cnt FROM users');
     const userCount = Number((rs.rows[0] as any[])[0]);
-    if (userCount > 0) {
-      setAuthConfiguredViaDb(true);
+    
+    if (userCount === 0) {
+      // Auto-seed default admin and operator if database is completely empty on launch
+      const adminUsername = 'admin';
+      const adminPassword = 'changeme';
+      const adminHash = await bcrypt.hash(adminPassword, 10);
+      const now = new Date().toISOString();
+      const adminId = crypto.randomUUID();
+      
+      await this.client.execute(
+        'INSERT INTO users (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+        [adminId, adminUsername, adminHash, 'admin', now, now],
+      );
+
+      const operatorId = crypto.randomUUID();
+      const operatorHash = await bcrypt.hash('operatorpass', 10);
+      await this.client.execute(
+        'INSERT INTO users (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+        [operatorId, 'operator', operatorHash, 'operator', now, now],
+      );
+      
+      console.log('🌱 Automatically seeded default admin and operator users.');
     }
+
+    setAuthConfiguredViaDb(true);
   }
 
   private async seedLabels() {

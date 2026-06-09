@@ -43,6 +43,8 @@ async function bootstrap() {
       'http://localhost:7302',
       'http://127.0.0.1:7302',
       'http://192.168.0.84:7300',
+      'https://bak.nepalacts.com',
+      'http://bak.nepalacts.com',
     ],
     credentials: true,
   });
