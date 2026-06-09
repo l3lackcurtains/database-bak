@@ -6,7 +6,7 @@ services:
       - redis-data:/data
 
   server:
-    image: ghcr.io/l3lackcurtains/database-bak/server:77cbfe737aa889155448307e86daa0d0e95ef3b6
+    image: ghcr.io/l3lackcurtains/database-bak/server:v1.0.0
     restart: unless-stopped
     ports:
       - "7301:7301"
@@ -29,7 +29,7 @@ services:
       - redis
 
   ui:
-    image: ghcr.io/l3lackcurtains/database-bak/ui:77cbfe737aa889155448307e86daa0d0e95ef3b6
+    image: ghcr.io/l3lackcurtains/database-bak/ui:v1.0.0
     restart: unless-stopped
     ports:
       - "7300:7300"

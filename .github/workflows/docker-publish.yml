@@ -33,6 +33,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository }}/server:latest
+            ${{ env.REGISTRY }}/${{ github.repository }}/server:v1.0.0
             ${{ env.REGISTRY }}/${{ github.repository }}/server:${{ github.sha }}
 
       - name: Build and push UI
@@ -43,4 +44,5 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository }}/ui:latest
+            ${{ env.REGISTRY }}/${{ github.repository }}/ui:v1.0.0
             ${{ env.REGISTRY }}/${{ github.repository }}/ui:${{ github.sha }}
