@@ -7,9 +7,6 @@ services:
 
   server:
     image: ghcr.io/l3lackcurtains/database-bak/server:latest
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     ports:
       - "7301:7301"
@@ -33,9 +30,6 @@ services:
 
   ui:
     image: ghcr.io/l3lackcurtains/database-bak/ui:latest
-    build:
-      context: .
-      dockerfile: apps/webapp/Dockerfile
     restart: unless-stopped
     ports:
       - "7300:7300"
