@@ -2,45 +2,43 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    volumes:
-      - redis-data:/data
+    networks:
+      - app-network
 
   server:
-    image: ghcr.io/l3lackcurtains/database-bak/server:v1.0.1
+    image: ghcr.io/l3lackcurtains/dbbak-server:v1.0.2
     restart: unless-stopped
+    networks:
+      - app-network
     ports:
       - "7301:7301"
-    volumes:
-      - ./data:/data
     environment:
       - PORT=7301
       - NODE_ENV=production
       - DATABASE_MODE=${DATABASE_MODE:-turso}
-      - SQLITE_PATH=/data/database-bak.sqlite
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - TURSO_DB_URL=${TURSO_DB_URL}
       - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - DASHBOARD_USERNAME=${DASHBOARD_USERNAME:-admin}
-      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-changeme}
       - AUTH_SECRET=${AUTH_SECRET}
     depends_on:
       - redis
 
   ui:
-    image: ghcr.io/l3lackcurtains/database-bak/ui:v1.0.1
+    image: ghcr.io/l3lackcurtains/dbbak-web:v1.0.2
     restart: unless-stopped
+    networks:
+      - app-network
     ports:
       - "7300:7300"
     environment:
       - PORT=7300
       - API_URL=http://server:7301
-      - DASHBOARD_USERNAME=${DASHBOARD_USERNAME:-admin}
-      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-changeme}
       - AUTH_SECRET=${AUTH_SECRET}
     depends_on:
       - server
 
-volumes:
-  redis-data:
+networks:
+  app-network:
+    driver: bridge

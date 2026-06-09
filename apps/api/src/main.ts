@@ -53,7 +53,7 @@ async function bootstrap() {
   app.use(sessionAuth);
 
   const port = process.env.PORT || 7301;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   console.log(`API running on http://localhost:${port}/api`);
 }
 bootstrap();

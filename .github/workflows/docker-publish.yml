@@ -32,9 +32,9 @@ jobs:
           file: apps/api/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/server:latest
-            ${{ env.REGISTRY }}/${{ github.repository }}/server:v1.0.1
-            ${{ env.REGISTRY }}/${{ github.repository }}/server:${{ github.sha }}
+            ${{ env.REGISTRY }}/l3lackcurtains/dbbak-server:latest
+            ${{ env.REGISTRY }}/l3lackcurtains/dbbak-server:v1.0.2
+            ${{ env.REGISTRY }}/l3lackcurtains/dbbak-server:${{ github.sha }}
 
       - name: Build and push UI
         uses: docker/build-push-action@v6
@@ -43,6 +43,6 @@ jobs:
           file: apps/webapp/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/ui:latest
-            ${{ env.REGISTRY }}/${{ github.repository }}/ui:v1.0.1
-            ${{ env.REGISTRY }}/${{ github.repository }}/ui:${{ github.sha }}
+            ${{ env.REGISTRY }}/l3lackcurtains/dbbak-web:latest
+            ${{ env.REGISTRY }}/l3lackcurtains/dbbak-web:v1.0.2
+            ${{ env.REGISTRY }}/l3lackcurtains/dbbak-web:${{ github.sha }}
