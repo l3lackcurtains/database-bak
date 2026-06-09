@@ -6,7 +6,7 @@ services:
       - app-network
 
   server:
-    image: ghcr.io/l3lackcurtains/dbbak-server:v1.0.2
+    image: ghcr.io/l3lackcurtains/dbbak-server:v1.0.3
     restart: unless-stopped
     networks:
       - app-network
@@ -26,7 +26,7 @@ services:
       - redis
 
   ui:
-    image: ghcr.io/l3lackcurtains/dbbak-web:v1.0.2
+    image: ghcr.io/l3lackcurtains/dbbak-web:v1.0.3
     restart: unless-stopped
     networks:
       - app-network
