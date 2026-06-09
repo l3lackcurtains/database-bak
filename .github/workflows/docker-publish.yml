@@ -33,7 +33,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/l3lackcurtains/dbbak-server:latest
-            ${{ env.REGISTRY }}/l3lackcurtains/dbbak-server:v1.0.3
+            ${{ env.REGISTRY }}/l3lackcurtains/dbbak-server:v1.0.4
             ${{ env.REGISTRY }}/l3lackcurtains/dbbak-server:${{ github.sha }}
 
       - name: Build and push UI
@@ -44,5 +44,5 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/l3lackcurtains/dbbak-web:latest
-            ${{ env.REGISTRY }}/l3lackcurtains/dbbak-web:v1.0.3
+            ${{ env.REGISTRY }}/l3lackcurtains/dbbak-web:v1.0.4
             ${{ env.REGISTRY }}/l3lackcurtains/dbbak-web:${{ github.sha }}

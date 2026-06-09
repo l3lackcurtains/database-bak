@@ -11,6 +11,9 @@ FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Install postgresql-client and mongodb-tools for backups
+RUN apk add --no-cache postgresql-client mongodb-tools
+
 COPY apps/api/package.json package.json
 RUN npm install --omit=dev --legacy-peer-deps
 

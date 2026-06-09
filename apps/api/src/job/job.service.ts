@@ -499,13 +499,22 @@ export class JobService {
     const key = `${db.type}/${safeDatabaseName}/${safeDatabaseName}-${scheduleSlug}-${timestamp}-${snapshot.id}.dump.gz`;
 
     const hashStream = new HashStream();
+    
+    const streamErrorPromise = new Promise<never>((_, reject) => {
+      dumpResult.stream.on('error', (err) => reject(err));
+      hashStream.on('error', (err) => reject(err));
+    });
+
     dumpResult.stream.pipe(hashStream);
 
-    const uploadResult = await this.storageService.uploadFile(
-      storage,
-      key,
-      hashStream,
-    );
+    const uploadResult = await Promise.race([
+      this.storageService.uploadFile(
+        storage,
+        key,
+        hashStream,
+      ),
+      streamErrorPromise,
+    ]);
 
     const uploadedSize = await this.storageService.getFileSize(storage, uploadResult.key);
     const checksum = hashStream.digest || '';
